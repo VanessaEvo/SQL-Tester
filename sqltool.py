@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 Professional SQL Injection Testing Tool
-Educational Use Only - 2024 Edition
+Educational Use Only - 2025 Edition
 """
 
 import tkinter as tk
@@ -25,6 +25,47 @@ from engine import SQLDetectionEngine, DetectionResult
 from report import ReportGenerator
 from user_agent import UserAgentManager
 
+class ScrollableFrame(tk.Frame):
+    """
+    A custom Tkinter frame that is scrollable.
+    It uses a Canvas widget to hold a frame that can be scrolled.
+    """
+    def __init__(self, container, *args, **kwargs):
+        super().__init__(container, *args, **kwargs)
+
+        # Extract background color to apply to all child widgets
+        bg_color = kwargs.get('bg', self.cget('bg'))
+
+        # Create a canvas and a vertical scrollbar
+        canvas = tk.Canvas(self, bg=bg_color, highlightthickness=0)
+        scrollbar = ttk.Scrollbar(self, orient="vertical", command=canvas.yview)
+
+        # This frame will hold the content and will be scrolled
+        self.scrollable_frame = tk.Frame(canvas, bg=bg_color)
+
+        # Bind the frame's configure event to update the canvas scroll region
+        self.scrollable_frame.bind(
+            "<Configure>",
+            lambda e: canvas.configure(
+                scrollregion=canvas.bbox("all")
+            )
+        )
+
+        # Place the scrollable frame inside the canvas
+        canvas_window = canvas.create_window((0, 0), window=self.scrollable_frame, anchor="nw")
+
+        # Configure the canvas to update the width of the inner frame when it's resized
+        def configure_inner_frame(event):
+            canvas.itemconfig(canvas_window, width=event.width)
+
+        canvas.bind("<Configure>", configure_inner_frame)
+        canvas.configure(yscrollcommand=scrollbar.set)
+
+        # Pack the widgets
+        canvas.pack(side="left", fill="both", expand=True)
+        scrollbar.pack(side="right", fill="y")
+
+
 class SQLInjectionTool:
     def __init__(self):
         self.root = tk.Tk()
@@ -35,7 +76,7 @@ class SQLInjectionTool:
         
     def setup_window(self):
         """Configure the main window"""
-        self.root.title("Professional SQL Injection Testing Tool - 2024 Edition")
+        self.root.title("Professional SQL Injection Testing Tool - 2025 Edition")
         self.root.geometry("1200x800")
         self.root.minsize(1000, 700)
         
@@ -147,9 +188,10 @@ class SQLInjectionTool:
         main_container = tk.Frame(single_frame, bg=self.colors['bg'])
         main_container.pack(fill='both', expand=True)
         
-        # Scrollable content area
-        content_frame = tk.Frame(main_container, bg=self.colors['bg'])
-        content_frame.pack(fill='both', expand=True, padx=5, pady=5)
+        # Use ScrollableFrame for the main content area
+        scrollable_area = ScrollableFrame(main_container, bg=self.colors['bg'])
+        scrollable_area.pack(fill='both', expand=True, padx=5, pady=5)
+        content_frame = scrollable_area.scrollable_frame
         
         # Left panel - Configuration
         left_panel = tk.LabelFrame(content_frame, text="🔧 Target Configuration", 
@@ -523,36 +565,42 @@ http://demo.site/user.php?user_id=456
         button_container.pack(fill='x', side='bottom', padx=10, pady=10)
         button_container.pack_propagate(False)  # Maintain fixed height
         
-        # Multi-scan control buttons
-        button_frame = tk.Frame(button_container, bg=self.colors['bg'])
-        button_frame.pack(expand=True)
-        
-        self.multi_scan_button = tk.Button(button_frame, text="🚀 START MULTI-SCAN", 
+        # --- REVISED BUTTON LAYOUT ---
+        button_frame_container = tk.Frame(button_container, bg=self.colors['bg'])
+        button_frame_container.pack(expand=True, fill='both')
+
+        # Clear Log button on the right
+        tk.Button(button_frame_container, text="Clear Log",
+                  command=self.clear_multi_results,
+                  bg=self.colors['frame_bg'], fg=self.colors['fg'],
+                  font=('Arial', 10)).pack(side='right', padx=(0, 20), ipady=5)
+
+        # Frame for centered control buttons
+        center_button_frame = tk.Frame(button_frame_container, bg=self.colors['bg'])
+        center_button_frame.pack(expand=True)
+
+        # Consistent styles
+        btn_font = ('Arial', 11, 'bold')
+        btn_width = 12
+        btn_height = 2
+
+        self.multi_scan_button = tk.Button(center_button_frame, text="START",
                                          command=self.start_multi_scan,
-                                         bg=self.colors['success'], fg=self.colors['button_fg'], 
-                                         font=('Arial', 12, 'bold'), 
-                                         width=18, height=2)
+                                         bg=self.colors['success'], fg=self.colors['button_fg'],
+                                         font=btn_font, width=btn_width, height=btn_height)
         self.multi_scan_button.pack(side='left', padx=5)
-        
-        self.multi_pause_button = tk.Button(button_frame, text="⏸️ PAUSE", 
+
+        self.multi_pause_button = tk.Button(center_button_frame, text="PAUSE",
                                           command=self.pause_multi_scan,
-                                          bg=self.colors['warning'], fg=self.colors['button_fg'], 
-                                          font=('Arial', 10), 
-                                          width=10, state='disabled')
+                                          bg=self.colors['warning'], fg=self.colors['button_fg'],
+                                          font=btn_font, width=btn_width, height=btn_height, state='disabled')
         self.multi_pause_button.pack(side='left', padx=5)
-        
-        self.multi_stop_button = tk.Button(button_frame, text="⏹️ STOP", 
+
+        self.multi_stop_button = tk.Button(center_button_frame, text="STOP",
                                          command=self.stop_multi_scan,
-                                         bg=self.colors['danger'], fg=self.colors['button_fg'], 
-                                         font=('Arial', 10), 
-                                         width=10, state='disabled')
+                                         bg=self.colors['danger'], fg=self.colors['button_fg'],
+                                         font=btn_font, width=btn_width, height=btn_height, state='disabled')
         self.multi_stop_button.pack(side='left', padx=5)
-        
-        tk.Button(button_frame, text="🗑️ Clear Results", 
-                 command=self.clear_multi_results,
-                 bg=self.colors['frame_bg'], fg=self.colors['fg'], 
-                 font=('Arial', 10), 
-                 width=12).pack(side='left', padx=5)
         
     def create_results_tab(self):
         """Create the results viewing and export tab"""
@@ -803,7 +851,7 @@ http://demo.site/user.php?user_id=456
                 bg=self.colors['bg'], fg=self.colors['accent'], 
                 font=('Arial', 18, 'bold')).pack()
         
-        tk.Label(header_frame, text="Version 2024.1 - Educational Edition", 
+        tk.Label(header_frame, text="Version 2025.1 - Educational Edition",
                 bg=self.colors['bg'], fg=self.colors['fg'], 
                 font=('Arial', 12)).pack(pady=(5, 0))
         
@@ -823,8 +871,8 @@ http://demo.site/user.php?user_id=456
 
 Developer: ShinX
 GitHub: https://github.com/VanessaEvo
-Version: 2024.1 Professional Edition
-Release Date: January 2024
+Version: 2025.1 Professional Edition
+Release Date: January 2025
 License: Educational Use Only
 
 🌟 TOOL OVERVIEW
@@ -919,6 +967,12 @@ Learning Objectives:
 📚 VERSION HISTORY
 ═══════════════════════════════════════════════════════════════════════════════
 
+Version 2025.1 (January 2025):
+• UI enhancements for responsive design and button layouts
+• Real-time statistics bug fix for multi-target scanning
+• Updated versioning and year information
+• Project documentation (README.md) created
+
 Version 2024.1 (January 2024):
 • Complete UI redesign with dark theme
 • Enhanced detection engine with improved accuracy
@@ -927,12 +981,6 @@ Version 2024.1 (January 2024):
 • Comprehensive reporting features
 • Modern user agent rotation
 • Improved WAF bypass techniques
-
-Version 2023.2 (December 2023):
-• Initial professional release
-• Basic SQL injection detection
-• Simple payload management
-• HTML report generation
 
 🙏 ACKNOWLEDGMENTS
 ═══════════════════════════════════════════════════════════════════════════════
@@ -1402,11 +1450,19 @@ Complexity: {'High' if len(payloads) > 50 else 'Medium' if len(payloads) > 20 el
             messagebox.showerror("Error", "Please enter domains to scan")
             return
         
-        # Check if any injection types are selected
         selected_types = [key for key, var in self.injection_types.items() if var.get()]
         if not selected_types:
             messagebox.showerror("Error", "Please select at least one injection type")
             return
+
+        # Update stats before starting thread for immediate UI feedback
+        self.multi_stats['status'].set("Scanning...")
+        self.multi_stats['domains'].set(len(domains))
+        self.multi_stats['completed'].set(0)
+        self.multi_stats['vulnerabilities'].set(0)
+        self.multi_progress_var.set(0)
+        self.multi_results_text.delete('1.0', tk.END)
+        self.root.update_idletasks()
         
         # Start multi-scan
         self.scan_running = True
@@ -1515,10 +1571,6 @@ Complexity: {'High' if len(payloads) > 50 else 'Medium' if len(payloads) > 20 el
     def run_multi_scan(self, domains, injection_types):
         """Run multiple target scan"""
         try:
-            self.multi_stats['status'].set("Scanning...")
-            self.multi_stats['domains'].set(len(domains))
-            self.multi_progress_var.set(0)
-            
             completed = 0
             total_vulnerabilities = 0
             
