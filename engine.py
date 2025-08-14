@@ -2,8 +2,10 @@ import re
 import time
 import hashlib
 from typing import Dict, List, Tuple, Optional
-from urllib.parse import unquote
+from urllib.parse import unquote, urlparse, parse_qs, urlencode, urlunparse
 import difflib
+import requests
+from user_agent import UserAgentManager
 
 class DetectionResult:
     def __init__(self, vulnerable, confidence, detection_type, database_type, error_message, response_time, additional_info=None):
@@ -22,12 +24,70 @@ class DetectionResult:
 
 class SQLDetectionEngine:
     def __init__(self):
+        self.user_agent_manager = UserAgentManager()
         self.baseline_response = None
         self.baseline_time = None
         self.baseline_hash = None
         self.baseline_length = 0
         self.response_patterns = {}
         self.time_samples = []
+
+    def detect_waf(self, url: str, timeout: int = 10) -> Tuple[bool, str]:
+        """
+        Proactively detects the presence of a Web Application Firewall (WAF).
+        Sends a benign but suspicious probe and checks for WAF-like responses.
+        """
+        waf_probes = [
+            "' OR 1=1 --",
+            "<script>alert('XSS')</script>",
+            "UNION SELECT NULL,NULL,NULL--",
+            "../etc/passwd"
+        ]
+        waf_indicators = [
+            'firewall', 'blocked', 'forbidden', 'incapsula', 'cloudflare',
+            'akamai', 'barracuda', 'f5', 'imperva', 'sucuri', 'wordfence'
+        ]
+
+        try:
+            # Get a clean baseline response first
+            headers = self.user_agent_manager.get_realistic_headers()
+            response = requests.get(url, headers=headers, timeout=timeout)
+            baseline_status = response.status_code
+
+            # Now send a malicious-looking probe
+            parsed_url = urlparse(url)
+            params = parse_qs(parsed_url.query)
+            if not params:
+                # If no params, add a dummy one
+                test_url = url + "?id=" + requests.utils.quote(waf_probes[0])
+            else:
+                # Add payload to the first parameter
+                param_key = list(params.keys())[0]
+                params[param_key] = [params[param_key][0] + waf_probes[0]]
+                new_query = urlencode(params, doseq=True)
+                test_url = urlunparse(parsed_url._replace(query=new_query))
+
+            response = requests.get(test_url, headers=headers, timeout=timeout)
+
+            # 1. Check for a change in status code, especially to a blocking one
+            if response.status_code != baseline_status and response.status_code in [403, 406, 429, 503]:
+                return (True, f"Status code changed from {baseline_status} to {response.status_code} on probe.")
+
+            # 2. Check response body for WAF indicators
+            response_text = response.text.lower()
+            for indicator in waf_indicators:
+                if indicator in response_text:
+                    return (True, f"Found WAF indicator keyword: '{indicator}' in response.")
+
+            # 3. Check for generic blocking pages
+            if "access denied" in response_text or "attack detected" in response_text:
+                return (True, "Generic blocking page detected in response.")
+
+        except requests.exceptions.RequestException as e:
+            # Network errors might hide a WAF, but we can't be certain.
+            return (False, f"Could not complete WAF check due to network error: {e}")
+
+        return (False, "No clear WAF indicators found.")
         
         # Enhanced error patterns with context awareness and severity scoring
         self.error_patterns = [
@@ -328,38 +388,78 @@ class SQLDetectionEngine:
         
         return None
 
-    def _analyze_time_based_advanced(self, response_time: float, payload: str) -> Tuple[bool, float]:
-        """Advanced time-based analysis with statistical methods"""
+    def _analyze_time_based_advanced(self, response_time: float, payload: str, request_context: Optional[Dict] = None) -> Tuple[bool, float, Dict]:
+        """
+        Advanced time-based analysis with statistical methods and re-verification.
+        """
         if not self.time_samples or len(self.time_samples) < 1:
-            return False, 0.0
+            return False, 0.0, {}
         
-        # Add current time to samples for future analysis
         self.time_samples.append(response_time)
-        
-        # Keep only recent samples (last 50)
         if len(self.time_samples) > 50:
             self.time_samples = self.time_samples[-50:]
         
-        # Calculate statistical metrics
         avg_time = sum(self.time_samples[:-1]) / len(self.time_samples[:-1])
-        
-        # Calculate standard deviation
         variance = sum((t - avg_time) ** 2 for t in self.time_samples[:-1]) / len(self.time_samples[:-1])
         std_dev = variance ** 0.5
-        
-        # Determine if current response time is anomalous
-        threshold = avg_time + (2 * std_dev)  # 2 standard deviations
-        
-        # Check for time-based payload indicators
+        threshold = avg_time + (3 * std_dev) + 2  # More robust threshold: 3 std deviations + 2 seconds buffer
+
         time_indicators = ['sleep', 'delay', 'waitfor', 'benchmark', 'pg_sleep']
         has_time_payload = any(indicator in payload.lower() for indicator in time_indicators)
-        
+
         if response_time > threshold and has_time_payload:
-            # Calculate confidence based on how much it exceeds the threshold
-            confidence = min(0.95, 0.7 + (response_time - threshold) / threshold * 0.2)
-            return True, confidence
-        
-        return False, 0.0
+            # Initial detection looks positive, attempt re-verification if possible
+            if request_context is None:
+                # Cannot re-verify, return with medium confidence
+                return True, 0.75, {"message": "Potential time-based vulnerability detected. Re-verification not possible."}
+
+            # --- Re-verification Logic ---
+            sleep_duration_match = re.search(r'(SLEEP|DELAY|WAITFOR|pg_sleep)\s*\(\s*(\d+)\s*\)', payload, re.IGNORECASE)
+            if not sleep_duration_match:
+                return True, 0.75, {"message": "Potential time-based vulnerability detected. Could not parse sleep duration for re-verification."}
+
+            original_duration = int(sleep_duration_match.group(2))
+            new_duration = original_duration * 2
+
+            # Create new payload for verification
+            new_payload = payload.replace(f"({original_duration})", f"({new_duration})", 1)
+
+            try:
+                # Re-use context to make the verification request
+                url = request_context['url']
+                headers = request_context['headers']
+                timeout = request_context['timeout']
+
+                parsed_url = urlparse(url)
+                params = parse_qs(parsed_url.query)
+                param_key = list(params.keys())[0] # Assume first param is the one being tested
+                original_value = params[param_key][0]
+
+                # We need to construct the test URL carefully, replacing the old payload part with the new one
+                base_value = original_value.replace(payload, '')
+                params[param_key] = [base_value + new_payload]
+                new_query = urlencode(params, doseq=True)
+                verify_url = urlunparse(parsed_url._replace(query=new_query))
+
+                start_time = time.time()
+                requests.get(verify_url, headers=headers, timeout=timeout + new_duration)
+                verify_response_time = time.time() - start_time
+
+                # Check if the verification response time matches the new expected delay
+                if verify_response_time >= new_duration * 0.8 and verify_response_time < new_duration * 1.5:
+                    return True, 0.98, {
+                        "message": f"Time-based vulnerability confirmed via re-verification with {new_duration}s delay.",
+                        "original_response_time": response_time,
+                        "verification_response_time": verify_response_time
+                    }
+                else:
+                    # Verification failed
+                    return False, 0.0, {"message": "Initial time-based anomaly was not confirmed upon re-verification."}
+
+            except Exception as e:
+                return False, 0.0, {"message": f"Re-verification failed due to an error: {e}"}
+
+        return False, 0.0, {}
 
     def _analyze_boolean_based_advanced(self, response_text: str, payload: str) -> Tuple[bool, float]:
         """Advanced boolean-based analysis"""
@@ -436,7 +536,7 @@ class SQLDetectionEngine:
         
         return False, 0.0
 
-    def analyze_response_comprehensive(self, response_text, payload, response_time, injection_type):
+    def analyze_response_comprehensive(self, response_text, payload, response_time, injection_type, request_context=None):
         """Comprehensive response analysis with maximum accuracy"""
         if self.baseline_response is None:
             return DetectionResult(
@@ -479,19 +579,22 @@ class SQLDetectionEngine:
 
         # Time-based detection with statistical analysis
         if injection_type == "time_based":
-            is_vulnerable, confidence = self._analyze_time_based_advanced(response_time, decoded_payload)
+            is_vulnerable, confidence, additional_info = self._analyze_time_based_advanced(response_time, decoded_payload, request_context)
             if is_vulnerable:
+                # Add standard info to the details from the analysis function
+                details = {
+                    "baseline_time": self.baseline_time,
+                    "response_time": response_time,
+                    "payload_decoded": decoded_payload
+                }
+                details.update(additional_info)
+
                 return DetectionResult(
                     True, confidence, injection_type, 
                     self._detect_database_type_advanced(response_text),
-                    "Time-based vulnerability detected through statistical analysis", 
+                    details.get("message", "Time-based vulnerability detected"),
                     response_time,
-                    {
-                        "baseline_time": self.baseline_time,
-                        "response_time": response_time,
-                        "time_difference": response_time - self.baseline_time,
-                        "payload_decoded": decoded_payload
-                    }
+                    details
                 )
 
         # Boolean-based detection with advanced similarity analysis

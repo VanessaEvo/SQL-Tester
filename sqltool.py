@@ -13,12 +13,14 @@ import urllib.parse
 import random
 import json
 import os
+import sys
 from datetime import datetime
 from typing import Dict, List, Any
 
 # Import our modules
 from domain import DomainManager
 from payload import PayloadManager
+from tamper import get_tamper_scripts
 from engine import SQLDetectionEngine, DetectionResult
 from report import ReportGenerator
 from user_agent import UserAgentManager
@@ -96,10 +98,13 @@ class SQLInjectionTool:
             'error_based': tk.BooleanVar(value=True),
             'advanced': tk.BooleanVar(value=False),
             'bypass': tk.BooleanVar(value=False),
-            'json': tk.BooleanVar(value=False)
+            'json': tk.BooleanVar(value=False),
+            'nosql': tk.BooleanVar(value=False)
         }
         
         # Scan control variables
+        self.scan_type = tk.StringVar(value="Quick Scan") # Quick Scan vs Full Scan
+        self.tamper_script = tk.StringVar()
         self.scan_running = False
         self.scan_paused = False
         self.scan_results = []
@@ -189,7 +194,8 @@ class SQLInjectionTool:
         injection_items = [
             ('basic', 'Basic'), ('union', 'Union'), ('boolean', 'Boolean'), 
             ('time_based', 'Time-based'), ('error_based', 'Error-based'), 
-            ('advanced', 'Advanced'), ('bypass', 'Bypass'), ('json', 'JSON')
+            ('advanced', 'Advanced'), ('bypass', 'Bypass'), ('json', 'JSON'),
+            ('nosql', 'NoSQL Injection')
         ]
         
         for i, (key, label) in enumerate(injection_items):
@@ -198,10 +204,12 @@ class SQLInjectionTool:
                               bg=self.colors['frame_bg'], fg=self.colors['fg'], 
                               selectcolor=self.colors['entry_bg'])
             cb.grid(row=row, column=col, sticky='w', padx=5, pady=2)
+            if key == 'nosql':
+                cb.config(state='disabled')
         
         # Quick selection buttons
         btn_frame = tk.Frame(injection_frame, bg=self.colors['frame_bg'])
-        btn_frame.grid(row=4, column=0, columnspan=2, pady=5)
+        btn_frame.grid(row=5, column=0, columnspan=2, pady=5)
         
         tk.Button(btn_frame, text="Select All", command=self.select_all_injections,
                  bg=self.colors['success'], fg=self.colors['button_fg'], 
@@ -220,6 +228,24 @@ class SQLInjectionTool:
                                      bg=self.colors['frame_bg'], fg=self.colors['fg'])
         settings_frame.pack(fill='x', padx=10, pady=10)
         
+        # Scan Type Radio Buttons
+        scan_type_frame = tk.Frame(settings_frame, bg=self.colors['frame_bg'])
+        scan_type_frame.pack(fill='x', padx=5, pady=5)
+        tk.Label(scan_type_frame, text="Scan Type:", bg=self.colors['frame_bg'], fg=self.colors['fg']).pack(side='left', padx=(0, 10))
+        tk.Radiobutton(scan_type_frame, text="Quick", variable=self.scan_type, value="Quick", bg=self.colors['frame_bg'], fg=self.colors['fg'], selectcolor=self.colors['entry_bg']).pack(side='left')
+        tk.Radiobutton(scan_type_frame, text="Full", variable=self.scan_type, value="Full", bg=self.colors['frame_bg'], fg=self.colors['fg'], selectcolor=self.colors['entry_bg']).pack(side='left', padx=(10, 0))
+
+        # Tamper Script Combobox
+        tamper_frame = tk.Frame(settings_frame, bg=self.colors['frame_bg'])
+        tamper_frame.pack(fill='x', padx=5, pady=5)
+        tk.Label(tamper_frame, text="Tamper Script:", bg=self.colors['frame_bg'], fg=self.colors['fg']).pack(side='left', padx=(0, 10))
+
+        self.tamper_scripts_map = get_tamper_scripts()
+        self.tamper_combobox = ttk.Combobox(tamper_frame, textvariable=self.tamper_script,
+                                            values=list(self.tamper_scripts_map.keys()), state="readonly")
+        self.tamper_combobox.set("None")
+        self.tamper_combobox.pack(fill='x', expand=True)
+
         # Request Delay
         tk.Label(settings_frame, text="Request Delay (s):", 
                 bg=self.colors['frame_bg'], fg=self.colors['fg']).pack(anchor='w', padx=5, pady=(5, 2))
@@ -1342,10 +1368,20 @@ Complexity: {'High' if len(payloads) > 50 else 'Medium' if len(payloads) > 20 el
             return
         
         # Check if any injection types are selected
-        selected_types = [key for key, var in self.injection_types.items() if var.get()]
+        selected_types = [key for key, var in self.injection_types.items() if var.get() and key != 'nosql']
         if not selected_types:
             messagebox.showerror("Error", "Please select at least one injection type")
             return
+
+        # --- Proactive WAF Detection ---
+        self.log_result("INFO: Performing proactive WAF detection...")
+        is_waf, waf_reason = self.detection_engine.detect_waf(url)
+        if is_waf:
+            self.log_result(f"WARNING: WAF Detected! Reason: {waf_reason}")
+            if not messagebox.askyesno("WAF Detected", "A WAF may be present, which could affect scan results. Do you want to continue?"):
+                return
+        else:
+            self.log_result("INFO: No clear WAF indicators found. Proceeding with scan.")
         
         # Start scan in separate thread
         self.scan_running = True
@@ -1389,19 +1425,38 @@ Complexity: {'High' if len(payloads) > 50 else 'Medium' if len(payloads) > 20 el
             
             # Get payloads for selected injection types
             all_payloads = []
+            scan_mode = self.scan_type.get()
+            self.log_result(f"INFO: Starting {scan_mode}...")
+
             for injection_type in injection_types:
                 payloads = self.payload_manager.get_payloads_by_type(injection_type)
+                if scan_mode == "Quick Scan":
+                    payloads = payloads[:15]  # Use a subset for Quick Scan
                 for payload in payloads:
                     all_payloads.append((injection_type, payload))
             
             total_payloads = len(all_payloads)
-            
+            if total_payloads == 0:
+                self.log_result("WARNING: No payloads to test for the selected injection types.")
+                self.stats['status'].set("Complete")
+                return
+
             for i, (injection_type, payload) in enumerate(all_payloads):
+                if not self.scan_running:
+                    self.log_result("INFO: Scan stopped by user.")
+                    break
+
+                # --- Pause/Resume Logic ---
+                while self.scan_paused:
+                    time.sleep(0.5)
+                    if not self.scan_running: # Check if stopped while paused
+                        self.log_result("INFO: Scan stopped by user while paused.")
+                        break
                 if not self.scan_running:
                     break
                 
                 # Update progress
-                progress = (i / total_payloads) * 100
+                progress = ((i + 1) / total_payloads) * 100
                 self.progress_var.set(progress)
                 self.progress_label.config(text=f"Testing payload {i+1}/{total_payloads}")
                 
@@ -1541,10 +1596,20 @@ Complexity: {'High' if len(payloads) > 50 else 'Medium' if len(payloads) > 20 el
     def test_payload(self, url, param, payload, injection_type):
         """Test a single payload"""
         try:
+            # --- Apply Tamper Script ---
+            selected_tamper_name = self.tamper_script.get()
+            tamper_function = self.tamper_scripts_map.get(selected_tamper_name)
+
+            original_payload = payload
+            if tamper_function:
+                payload = tamper_function(payload)
+
             # Construct test URL
             parsed = urllib.parse.urlparse(url)
             params = urllib.parse.parse_qs(parsed.query)
             
+            # This logic assumes the parameter value doesn't already contain the payload
+            # A more robust implementation would handle replacing existing payloads
             if param in params:
                 params[param] = [params[param][0] + payload]
             else:
@@ -1565,15 +1630,24 @@ Complexity: {'High' if len(payloads) > 50 else 'Medium' if len(payloads) > 20 el
                                   timeout=self.request_timeout.get())
             response_time = time.time() - start_time
             
+            # --- Pass Request Context for Re-verification ---
+            request_context = {
+                'url': url, # Pass the original URL without payload
+                'param': param,
+                'headers': headers,
+                'timeout': self.request_timeout.get(),
+                'tamper_function': tamper_function # Pass for re-verification tampering
+            }
+
             # Analyze response
             result = self.detection_engine.analyze_response_comprehensive(
-                response.text, payload, response_time, injection_type
+                response.text, original_payload, response_time, injection_type, request_context
             )
             
             return result
             
         except Exception as e:
-            self.log_result(f"❌ Request failed: {str(e)}")
+            self.log_result(f"❌ Request failed for payload '{payload[:50]}...': {str(e)}")
             return None
     
     def log_result(self, message):
@@ -1669,8 +1743,51 @@ Complexity: {'High' if len(payloads) > 50 else 'Medium' if len(payloads) > 20 el
             self.multi_stop_button.config(state='disabled')
             self.start_button.config(state='normal')
     
+    def handle_startup_checks(self) -> bool:
+        """
+        Handles startup checks, including the ethical agreement dialog.
+        Returns False if the application should exit.
+        """
+        config_file = 'config.json'
+        try:
+            if os.path.exists(config_file):
+                with open(config_file, 'r') as f:
+                    config = json.load(f)
+                if config.get('agreement_accepted') is True:
+                    return True
+        except (IOError, json.JSONDecodeError):
+            # Config is corrupted or unreadable, show dialog again
+            pass
+
+        agreement_text = """
+LEGAL DISCLAIMER & ETHICAL USE
+
+1. AUTHORIZED USE ONLY: You must only use this tool on systems you own or have explicit, written permission to test.
+2. EDUCATIONAL PURPOSE: This tool is intended for educational and security research purposes only.
+3. COMPLIANCE: You must comply with all applicable laws and regulations. Unauthorized scanning is illegal.
+4. NO WARRANTY: This tool is provided 'as-is'. The developers are not responsible for any misuse or damage.
+
+By clicking 'Yes', you agree to these terms and take full responsibility for your actions.
+Do you agree to these terms?
+"""
+        response = messagebox.askyesno("Ethical Agreement", agreement_text, icon='warning')
+
+        if response:
+            try:
+                with open(config_file, 'w') as f:
+                    json.dump({'agreement_accepted': True}, f)
+            except IOError:
+                messagebox.showwarning("Configuration Error", "Could not save settings. You may be asked to agree again next time.")
+            return True
+        else:
+            self.root.destroy()
+            return False
+
     def run(self):
         """Start the application"""
+        # Perform startup checks after window is created but before mainloop
+        if not self.handle_startup_checks():
+            return  # Exit if user disagrees
         self.root.mainloop()
 
 def main():

