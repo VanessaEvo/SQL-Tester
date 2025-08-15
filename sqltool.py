@@ -1395,9 +1395,6 @@ Complexity: {'High' if len(payloads) > 50 else 'Medium' if len(payloads) > 20 el
             messagebox.showwarning("Warning", "No domains to validate")
             return
         
-        # Update multi-scan statistics
-        self.multi_stats['domains'].set(len(domains))
-        
         # Show validation in multi-results
         self.multi_results_text.delete('1.0', tk.END)
         self.multi_results_text.insert(tk.END, "Validating domains...\n\n")
@@ -1414,6 +1411,9 @@ Complexity: {'High' if len(payloads) > 50 else 'Medium' if len(payloads) > 20 el
                 self.multi_results_text.insert(tk.END, f"❌ {domain}: {message}\n")
                 invalid_count += 1
         
+        # Update multi-scan statistics with only the valid count
+        self.multi_stats['domains'].set(valid_count)
+
         self.multi_results_text.insert(tk.END, f"\n📊 Summary: {valid_count} valid, {invalid_count} invalid")
         
     def start_single_scan(self):
