@@ -165,6 +165,7 @@ class SQLInjectionTool:
         self.scan_running = False
         self.scan_paused = False
         self.scan_results = []
+        self.valid_domains_to_scan = []
         
         # Statistics variables
         self.stats = {
@@ -462,6 +463,10 @@ class SQLInjectionTool:
         
         tk.Button(file_frame, text="✅ Validate Domains", command=self.validate_domains,
                  bg=self.colors['warning'], fg=self.colors['button_fg'], 
+                 font=('Arial', 9)).pack(side='left', padx=5)
+
+        tk.Button(file_frame, text="🗑️ Clear", command=self.clear_domain_list,
+                 bg=self.colors['danger'], fg=self.colors['button_fg'],
                  font=('Arial', 9)).pack(side='left', padx=5)
         
         # Domain input area
@@ -1386,6 +1391,18 @@ Complexity: {'High' if len(payloads) > 50 else 'Medium' if len(payloads) > 20 el
             except Exception as e:
                 messagebox.showerror("Error", f"Failed to save file: {str(e)}")
     
+    def clear_domain_list(self):
+        """Clear the domain list text area and the validated domains list."""
+        if messagebox.askyesno("Confirm Clear", "Anda yakin ingin membersihkan daftar domain?"):
+            self.domain_text.delete('1.0', tk.END)
+            self.valid_domains_to_scan.clear()
+            self.log_multi_result("INFO: Daftar domain telah dibersihkan.")
+            # Reset statistics
+            self.multi_stats['domains'].set(0)
+            self.multi_stats['completed'].set(0)
+            self.multi_stats['vulnerabilities'].set(0)
+            self.multi_stats['status'].set("Ready")
+
     def validate_domains(self):
         """Validate the entered domains"""
         content = self.domain_text.get('1.0', tk.END)
@@ -1401,11 +1418,13 @@ Complexity: {'High' if len(payloads) > 50 else 'Medium' if len(payloads) > 20 el
         
         valid_count = 0
         invalid_count = 0
+        self.valid_domains_to_scan.clear()
         
         for domain in domains:
             is_valid, message = self.domain_manager.validate_url(domain)
             if is_valid:
                 self.multi_results_text.insert(tk.END, f"✅ {domain}\n")
+                self.valid_domains_to_scan.append(domain)
                 valid_count += 1
             else:
                 self.multi_results_text.insert(tk.END, f"❌ {domain}: {message}\n")
@@ -1465,12 +1484,10 @@ Complexity: {'High' if len(payloads) > 50 else 'Medium' if len(payloads) > 20 el
     
     def start_multi_scan(self):
         """Start multiple targets scan"""
-        content = self.domain_text.get('1.0', tk.END)
-        domains = [line.strip() for line in content.split('\n') 
-                  if line.strip() and not line.strip().startswith('#')]
+        domains = self.valid_domains_to_scan
         
         if not domains:
-            messagebox.showerror("Error", "Please enter domains to scan")
+            messagebox.showerror("Error", "Please validate domains first. The list of valid domains to scan is empty.")
             return
         
         selected_types = [key for key, var in self.injection_types.items() if var.get()]
