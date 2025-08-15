@@ -27,43 +27,59 @@ from user_agent import UserAgentManager
 
 class ScrollableFrame(tk.Frame):
     """
-    A custom Tkinter frame that is scrollable.
-    It uses a Canvas widget to hold a frame that can be scrolled.
+    A more robust custom Tkinter frame that is scrollable.
+    Includes mouse wheel scrolling for Windows and Linux.
     """
     def __init__(self, container, *args, **kwargs):
         super().__init__(container, *args, **kwargs)
 
-        # Extract background color to apply to all child widgets
         bg_color = kwargs.get('bg', self.cget('bg'))
 
-        # Create a canvas and a vertical scrollbar
-        canvas = tk.Canvas(self, bg=bg_color, highlightthickness=0)
-        scrollbar = ttk.Scrollbar(self, orient="vertical", command=canvas.yview)
+        self.canvas = tk.Canvas(self, bg=bg_color, highlightthickness=0)
+        self.scrollbar = ttk.Scrollbar(self, orient="vertical", command=self.canvas.yview)
+        self.scrollable_frame = tk.Frame(self.canvas, bg=bg_color)
 
-        # This frame will hold the content and will be scrolled
-        self.scrollable_frame = tk.Frame(canvas, bg=bg_color)
-
-        # Bind the frame's configure event to update the canvas scroll region
         self.scrollable_frame.bind(
             "<Configure>",
-            lambda e: canvas.configure(
-                scrollregion=canvas.bbox("all")
-            )
+            lambda e: self.canvas.configure(scrollregion=self.canvas.bbox("all"))
         )
 
-        # Place the scrollable frame inside the canvas
-        canvas_window = canvas.create_window((0, 0), window=self.scrollable_frame, anchor="nw")
+        self.canvas.create_window((0, 0), window=self.scrollable_frame, anchor="nw")
+        self.canvas.configure(yscrollcommand=self.scrollbar.set)
 
-        # Configure the canvas to update the width of the inner frame when it's resized
-        def configure_inner_frame(event):
-            canvas.itemconfig(canvas_window, width=event.width)
+        self.canvas.pack(side="left", fill="both", expand=True)
+        self.scrollbar.pack(side="right", fill="y")
 
-        canvas.bind("<Configure>", configure_inner_frame)
-        canvas.configure(yscrollcommand=scrollbar.set)
+        # Bind mouse wheel scrolling for cross-platform compatibility
+        self.bind_mousewheel()
 
-        # Pack the widgets
-        canvas.pack(side="left", fill="both", expand=True)
-        scrollbar.pack(side="right", fill="y")
+    def bind_mousewheel(self):
+        self.bind('<Enter>', self._bind_to_mousewheel)
+        self.bind('<Leave>', self._unbind_from_mousewheel)
+
+    def _bind_to_mousewheel(self, event):
+        """Bind mouse wheel events."""
+        self.bind_all("<MouseWheel>", self._on_mousewheel) # Windows
+        self.bind_all("<Button-4>", self._on_mousewheel)   # Linux (scroll up)
+        self.bind_all("<Button-5>", self._on_mousewheel)   # Linux (scroll down)
+
+    def _unbind_from_mousewheel(self, event):
+        """Unbind mouse wheel events."""
+        self.unbind_all("<MouseWheel>")
+        self.unbind_all("<Button-4>")
+        self.unbind_all("<Button-5>")
+
+    def _on_mousewheel(self, event):
+        """Handle mouse wheel scrolling."""
+        # Determine scroll direction and magnitude
+        if sys.platform == "win32":
+            delta = -1 * (event.delta // 120)
+        elif event.num == 4: # Linux scroll up
+            delta = -1
+        else: # Linux scroll down
+            delta = 1
+
+        self.canvas.yview_scroll(delta, "units")
 
 
 class SQLInjectionTool:
@@ -367,36 +383,42 @@ class SQLInjectionTool:
         button_container.pack(fill='x', side='bottom', padx=10, pady=10)
         button_container.pack_propagate(False)  # Maintain fixed height
         
-        # Scan control buttons
-        button_frame = tk.Frame(button_container, bg=self.colors['bg'])
-        button_frame.pack(expand=True)
-        
-        self.start_button = tk.Button(button_frame, text="🚀 START SCAN", 
-                                    command=self.start_single_scan,
-                                    bg=self.colors['success'], fg=self.colors['button_fg'], 
-                                    font=('Arial', 12, 'bold'), 
-                                    width=15, height=2)
+        # --- REVISED BUTTON LAYOUT (Single Target) ---
+        button_frame_container = tk.Frame(button_container, bg=self.colors['bg'])
+        button_frame_container.pack(expand=True, fill='both')
+
+        # Clear Results button on the right
+        tk.Button(button_frame_container, text="Clear Results",
+                  command=self.clear_results,
+                  bg=self.colors['frame_bg'], fg=self.colors['fg'],
+                  font=('Arial', 10)).pack(side='right', padx=(0, 20), ipady=5)
+
+        # Frame for centered control buttons
+        center_button_frame = tk.Frame(button_frame_container, bg=self.colors['bg'])
+        center_button_frame.pack(expand=True)
+
+        # Consistent styles from multi-target tab
+        btn_font = ('Arial', 11, 'bold')
+        btn_width = 12
+        btn_height = 2
+
+        self.start_button = tk.Button(center_button_frame, text="START SCAN",
+                                         command=self.start_single_scan,
+                                         bg=self.colors['success'], fg=self.colors['button_fg'],
+                                         font=btn_font, width=btn_width, height=btn_height)
         self.start_button.pack(side='left', padx=5)
-        
-        self.pause_button = tk.Button(button_frame, text="⏸️ PAUSE", 
-                                    command=self.pause_scan,
-                                    bg=self.colors['warning'], fg=self.colors['button_fg'], 
-                                    font=('Arial', 10), 
-                                    width=10, state='disabled')
+
+        self.pause_button = tk.Button(center_button_frame, text="PAUSE",
+                                          command=self.pause_scan,
+                                          bg=self.colors['warning'], fg=self.colors['button_fg'],
+                                          font=btn_font, width=btn_width, height=btn_height, state='disabled')
         self.pause_button.pack(side='left', padx=5)
-        
-        self.stop_button = tk.Button(button_frame, text="⏹️ STOP", 
-                                   command=self.stop_scan,
-                                   bg=self.colors['danger'], fg=self.colors['button_fg'], 
-                                   font=('Arial', 10), 
-                                   width=10, state='disabled')
+
+        self.stop_button = tk.Button(center_button_frame, text="STOP",
+                                         command=self.stop_scan,
+                                         bg=self.colors['danger'], fg=self.colors['button_fg'],
+                                         font=btn_font, width=btn_width, height=btn_height, state='disabled')
         self.stop_button.pack(side='left', padx=5)
-        
-        tk.Button(button_frame, text="🗑️ Clear Results", 
-                 command=self.clear_results,
-                 bg=self.colors['frame_bg'], fg=self.colors['fg'], 
-                 font=('Arial', 10), 
-                 width=12).pack(side='left', padx=5)
         
     def create_multiple_targets_tab(self):
         """Create the multiple targets testing tab"""
@@ -1014,7 +1036,7 @@ Remember: Always use this tool responsibly and ethically. The goal is to improve
                 font=('Arial', 10, 'bold')).pack()
         
     def create_stat_card(self, parent, title, variable, color, column):
-        """Create a statistics card"""
+        """Create a statistics card that automatically updates."""
         card = tk.Frame(parent, bg=color, relief='raised', bd=2)
         card.grid(row=0, column=column, padx=5, pady=5, sticky='ew')
         parent.grid_columnconfigure(column, weight=1)
@@ -1022,13 +1044,10 @@ Remember: Always use this tool responsibly and ethically. The goal is to improve
         tk.Label(card, text=title, bg=color, fg='white', 
                 font=('Arial', 10, 'bold')).pack(pady=(5, 0))
         
-        if isinstance(variable, tk.StringVar):
-            value_text = variable.get()
-        else:
-            value_text = str(variable.get())
-            
-        tk.Label(card, text=value_text, bg=color, fg='white', 
-                font=('Arial', 14, 'bold')).pack(pady=(0, 5))
+        # Use textvariable to make the label update automatically
+        value_label = tk.Label(card, textvariable=variable, bg=color, fg='white',
+                               font=('Arial', 14, 'bold'))
+        value_label.pack(pady=(0, 5))
 
     # Results Tab Methods
     def export_html_report(self):
@@ -1431,6 +1450,10 @@ Complexity: {'High' if len(payloads) > 50 else 'Medium' if len(payloads) > 20 el
         else:
             self.log_result("INFO: No clear WAF indicators found. Proceeding with scan.")
         
+        # Update UI before starting thread for immediate feedback
+        self.stats['status'].set("Scanning...")
+        self.root.update_idletasks()
+
         # Start scan in separate thread
         self.scan_running = True
         self.update_scan_buttons()
@@ -1476,7 +1499,6 @@ Complexity: {'High' if len(payloads) > 50 else 'Medium' if len(payloads) > 20 el
     def run_single_scan(self, url, param, injection_types):
         """Run the actual single target scan"""
         try:
-            self.stats['status'].set("Scanning...")
             self.progress_var.set(0)
             
             # Get payloads for selected injection types
