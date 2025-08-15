@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-Professional SQL Injection Testing Tool
-Educational Use Only - 2025 Edition
+SQL Injection Testing Tool
+Educational Use Only - 2025
 """
 
 import tkinter as tk
@@ -898,14 +898,14 @@ http://demo.site/user.php?user_id=456
 
 Developer: ShinX
 GitHub: https://github.com/VanessaEvo
-Version: 2025.1 Professional Edition
-Release Date: January 2025
+Version: 2025.1
+Release Date: July 2025
 License: Educational Use Only
 
 🌟 TOOL OVERVIEW
 ═══════════════════════════════════════════════════════════════════════════════
 
-This Professional SQL Injection Testing Tool is designed for educational purposes and authorized security testing. It provides a comprehensive platform for learning about SQL injection vulnerabilities and testing web applications with proper authorization.
+This SQL Injection Testing Tool is designed for educational purposes and authorized security testing. It provides a comprehensive platform for learning about SQL injection vulnerabilities and testing web applications with proper authorization.
 
 🔧 KEY FEATURES
 ═══════════════════════════════════════════════════════════════════════════════
@@ -990,24 +990,6 @@ Learning Objectives:
 • Learn about database security
 • Practice responsible vulnerability disclosure
 • Develop defensive programming skills
-
-📚 VERSION HISTORY
-═══════════════════════════════════════════════════════════════════════════════
-
-Version 2025.1 (January 2025):
-• UI enhancements for responsive design and button layouts
-• Real-time statistics bug fix for multi-target scanning
-• Updated versioning and year information
-• Project documentation (README.md) created
-
-Version 2024.1 (January 2024):
-• Complete UI redesign with dark theme
-• Enhanced detection engine with improved accuracy
-• Multi-target scanning capabilities
-• Advanced payload management system
-• Comprehensive reporting features
-• Modern user agent rotation
-• Improved WAF bypass techniques
 
 🙏 ACKNOWLEDGMENTS
 ═══════════════════════════════════════════════════════════════════════════════
