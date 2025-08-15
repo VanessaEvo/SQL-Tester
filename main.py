@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-Professional SQL Injection Testing Tool Launcher
-Educational Use Only - 2024 Edition
+SQL Injection Testing Tool Launcher
+Educational Use Only
 """
 
 import sys
@@ -86,10 +86,10 @@ def check_files():
 def show_banner():
     """Display welcome banner"""
     banner = """
-    🛡️ PROFESSIONAL SQL INJECTION TESTING TOOL
+    🛡️ SQL INJECTION TESTING TOOL
     ═══════════════════════════════════════════════
 
-    2024 Edition - Educational Use Only
+    Educational Use Only
 
     ⚠️  IMPORTANT: This tool is for educational purposes and
     authorized testing only. Never test systems without
