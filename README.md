@@ -46,7 +46,7 @@ To get started with the SQL Injection Testing Tool, follow these steps:
 1.  **Clone the Repository:**
     First, clone the repository to your local machine using Git.
     ```bash
-    git clone https://github.com/VanessaEvo/sql-tester-tool.git
+    git clone https://github.com/VanessaEvo/sql-tester.git
     cd sql-tester-tool
     ```
 
