@@ -1,4 +1,4 @@
-## This is just a project to pass the time, and I have no plans to maintain it any longer. If you'd like to improve this tool, please submit a Pull Request.
+## This is just a project to fill my time, and I have no plans to maintain it any longer. If you'd like to improve this tool, please submit a Pull Request.
 
 # SQL Injection Testing Tool
 
