@@ -1,8 +1,10 @@
-# Professional SQL Injection Testing Tool - 2025.1
+## This is just a project to pass the time, and I have no plans to maintain it any longer. If you'd like to improve this tool, please submit a Pull Request.
+
+# SQL Injection Testing Tool
 
 ## 🌟 Overview
 
-This Professional SQL Injection Testing Tool is designed for educational purposes and authorized security testing. It provides a comprehensive, multi-threaded platform for learning about SQL injection vulnerabilities and testing the security of web applications with proper authorization.
+This SQL Injection Testing Tool is designed for educational purposes and authorized security testing. It provides a comprehensive, multi-threaded platform for learning about SQL injection vulnerabilities and testing the security of web applications with proper authorization.
 
 Built with Python and Tkinter, it features a modern, intuitive user interface and a powerful detection engine to help users identify and understand SQLi vulnerabilities effectively.
 
