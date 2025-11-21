@@ -16,6 +16,7 @@ import os
 import sys
 from datetime import datetime
 from typing import Dict, List, Any
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 # Import our modules
 from domain import DomainManager
@@ -167,6 +168,7 @@ class SQLInjectionTool:
         self.current_scan_mode = 'single'  # Track which scan is running: 'single' or 'multi'
         self.scan_results = []
         self.valid_domains_to_scan = []
+        self.results_lock = threading.Lock()  # Thread-safe lock for updating shared data
         
         # Statistics variables
         self.stats = {
@@ -1607,78 +1609,126 @@ Complexity: {'High' if len(payloads) > 50 else 'Medium' if len(payloads) > 20 el
             self.scan_running = False
             self.update_scan_buttons()
     
+    def scan_single_domain(self, domain, injection_types):
+        """Worker function to scan a single domain - used by thread pool"""
+        vulnerabilities_found = 0
+
+        try:
+            # Log current domain
+            self.log_multi_result(f"🎯 Scanning: {domain}")
+
+            # Extract parameters from domain
+            parsed = urllib.parse.urlparse(domain)
+            params = urllib.parse.parse_qs(parsed.query)
+
+            if not params:
+                self.log_multi_result(f"⚠️ No parameters found in: {domain}")
+                return 0
+
+            # Test each parameter
+            for param_name in params.keys():
+                if not self.scan_running:
+                    break
+
+                for injection_type in injection_types:
+                    if not self.scan_running:
+                        break
+
+                    payloads = self.payload_manager.get_payloads_by_type(injection_type)
+
+                    for payload in payloads[:5]:  # Limit payloads for multi-scan
+                        if not self.scan_running:
+                            break
+
+                        result = self.test_payload(domain, param_name, payload, injection_type)
+
+                        if result and result.vulnerable:
+                            vulnerabilities_found += 1
+                            self.log_multi_result(f"🚨 VULNERABILITY: {domain} - {param_name}")
+
+                            # Add to results (thread-safe)
+                            scan_result = {
+                                'timestamp': datetime.now().isoformat(),
+                                'target_url': domain,
+                                'test_parameter': param_name,
+                                'injection_type': injection_type,
+                                'vulnerable': True,
+                                'payload': payload,
+                                'confidence': result.confidence,
+                                'evidence': result.error_message,
+                                'risk_level': 'High' if result.confidence > 0.8 else 'Medium'
+                            }
+
+                            with self.results_lock:
+                                self.scan_results.append(scan_result)
+
+                            break  # Move to next injection type
+
+                        time.sleep(self.request_delay.get())
+
+        except Exception as e:
+            self.log_multi_result(f"❌ Error scanning {domain}: {str(e)}")
+
+        return vulnerabilities_found
+
     def run_multi_scan(self, domains, injection_types):
-        """Run multiple target scan"""
+        """Run multiple target scan with thread pool support"""
         try:
             # FIXED: Set scan mode to 'multi' so logs go to correct tab
             self.current_scan_mode = 'multi'
             completed = 0
             total_vulnerabilities = 0
 
-            for i, domain in enumerate(domains):
-                if not self.scan_running:
-                    break
-                
-                # Update progress
-                progress = (i / len(domains)) * 100
-                self.multi_progress_var.set(progress)
-                self.multi_progress_label.config(text=f"Scanning domain {i+1}/{len(domains)}")
-                
-                # Log current domain
-                self.log_multi_result(f"🎯 Scanning: {domain}")
-                
-                # Extract parameters from domain
-                try:
-                    parsed = urllib.parse.urlparse(domain)
-                    params = urllib.parse.parse_qs(parsed.query)
-                    
-                    if params:
-                        for param_name in params.keys():
-                            # Test each parameter
-                            for injection_type in injection_types:
-                                payloads = self.payload_manager.get_payloads_by_type(injection_type)
-                                
-                                for payload in payloads[:5]:  # Limit payloads for multi-scan
-                                    if not self.scan_running:
-                                        break
-                                    
-                                    result = self.test_payload(domain, param_name, payload, injection_type)
-                                    
-                                    if result and result.vulnerable:
-                                        total_vulnerabilities += 1
-                                        self.log_multi_result(f"🚨 VULNERABILITY: {domain} - {param_name}")
-                                        
-                                        # Add to results
-                                        scan_result = {
-                                            'timestamp': datetime.now().isoformat(),
-                                            'target_url': domain,
-                                            'test_parameter': param_name,
-                                            'injection_type': injection_type,
-                                            'vulnerable': True,
-                                            'payload': payload,
-                                            'confidence': result.confidence,
-                                            'evidence': result.error_message,
-                                            'risk_level': 'High' if result.confidence > 0.8 else 'Medium'
-                                        }
-                                        self.scan_results.append(scan_result)
-                                        break  # Move to next injection type
-                                    
-                                    time.sleep(self.request_delay.get())
-                    else:
-                        self.log_multi_result(f"⚠️ No parameters found in: {domain}")
-                        
-                except Exception as e:
-                    self.log_multi_result(f"❌ Error scanning {domain}: {str(e)}")
-                
-                completed += 1
-                self.multi_stats['completed'].set(completed)
-                self.multi_stats['vulnerabilities'].set(total_vulnerabilities)
-            
+            # Get number of threads from settings
+            num_threads = self.threads.get()
+            total_domains = len(domains)
+
+            self.log_multi_result(f"🚀 Starting multi-scan with {num_threads} threads...")
+            self.log_multi_result(f"📊 Total targets: {total_domains}")
+
+            # Use ThreadPoolExecutor for parallel scanning
+            with ThreadPoolExecutor(max_workers=num_threads) as executor:
+                # Submit all domain scan jobs
+                future_to_domain = {
+                    executor.submit(self.scan_single_domain, domain, injection_types): domain
+                    for domain in domains
+                }
+
+                # Process completed scans as they finish
+                for future in as_completed(future_to_domain):
+                    if not self.scan_running:
+                        # Cancel remaining tasks
+                        for f in future_to_domain:
+                            f.cancel()
+                        break
+
+                    domain = future_to_domain[future]
+
+                    try:
+                        # Get result from completed scan
+                        vulnerabilities = future.result()
+                        total_vulnerabilities += vulnerabilities
+
+                    except Exception as e:
+                        self.log_multi_result(f"❌ Exception in thread for {domain}: {str(e)}")
+
+                    # Update progress (thread-safe)
+                    completed += 1
+                    progress = (completed / total_domains) * 100
+
+                    with self.results_lock:
+                        self.multi_progress_var.set(progress)
+                        self.multi_progress_label.config(text=f"Scanning domain {completed}/{total_domains}")
+                        self.multi_stats['completed'].set(completed)
+                        self.multi_stats['vulnerabilities'].set(total_vulnerabilities)
+
+            # Scan complete
             self.multi_progress_var.set(100)
             self.multi_stats['status'].set("Complete")
-            self.multi_progress_label.config(text="Multi-scan completed!")
+            self.multi_progress_label.config(text=f"Multi-scan completed! ({num_threads} threads)")
+            self.log_multi_result(f"✅ Scan complete! Total vulnerabilities: {total_vulnerabilities}")
             self.update_results_summary()
-            
+
         except Exception as e:
             self.log_multi_result(f"❌ Error during multi-scan: {str(e)}")
             self.multi_stats['status'].set("Error")
