@@ -1499,7 +1499,22 @@ Complexity: {'High' if len(payloads) > 50 else 'Medium' if len(payloads) > 20 el
         """Run the actual single target scan"""
         try:
             self.progress_var.set(0)
-            
+
+            # CRITICAL FIX: Establish baseline response BEFORE testing payloads
+            self.log_result("INFO: Establishing baseline response...")
+            try:
+                baseline_headers = self.user_agent_manager.get_realistic_headers()
+                baseline_start = time.time()
+                baseline_resp = requests.get(url, headers=baseline_headers, timeout=self.request_timeout.get())
+                baseline_time = time.time() - baseline_start
+
+                self.detection_engine.set_baseline(baseline_resp.text, baseline_time)
+                self.log_result(f"✓ Baseline established (status: {baseline_resp.status_code}, time: {baseline_time:.2f}s, size: {len(baseline_resp.text)} bytes)")
+            except Exception as e:
+                self.log_result(f"⚠ WARNING: Could not establish baseline: {str(e)}")
+                self.log_result("⚠ This may result in inaccurate detection, especially for boolean-based and time-based attacks.")
+                # Continue anyway, but user is warned
+
             # Get payloads for selected injection types
             all_payloads = []
             scan_mode = self.scan_type.get()
@@ -1511,7 +1526,7 @@ Complexity: {'High' if len(payloads) > 50 else 'Medium' if len(payloads) > 20 el
                     payloads = payloads[:15]  # Use a subset for Quick Scan
                 for payload in payloads:
                     all_payloads.append((injection_type, payload))
-            
+
             total_payloads = len(all_payloads)
             if total_payloads == 0:
                 self.log_result("WARNING: No payloads to test for the selected injection types.")

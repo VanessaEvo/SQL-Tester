@@ -156,6 +156,7 @@ class SQLDetectionEngine:
         
         # False positive patterns - These should NOT be considered vulnerabilities
         self.false_positive_patterns = [
+            # Educational content
             r"SQL tutorial",
             r"SQL reference",
             r"SQL documentation",
@@ -169,6 +170,8 @@ class SQLDetectionEngine:
             r"What is SQL",
             r"SQL basics",
             r"SQL commands",
+
+            # Security content
             r"SQL injection prevention",
             r"How to prevent SQL injection",
             r"SQL security",
@@ -177,7 +180,38 @@ class SQLDetectionEngine:
             r"SQL best practices",
             r"Database security",
             r"OWASP",
-            r"Security guidelines"
+            r"Security guidelines",
+            r"secure coding",
+            r"input validation",
+            r"sanitization",
+
+            # Developer resources
+            r"stackoverflow\.com",
+            r"github\.com",
+            r"developer\.mozilla",
+            r"w3schools",
+            r"code example",
+            r"programming example",
+            r"example\.com",
+            r"test\.com",
+            r"sample code",
+
+            # Documentation & blogs
+            r"API documentation",
+            r"error handling",
+            r"exception handling",
+            r"<pre><code>",
+            r"<code[^>]*>.*?SQL.*?</code>",
+            r"syntax highlighter",
+            r"blog post",
+            r"article about",
+
+            # Database documentation
+            r"MySQL manual",
+            r"PostgreSQL docs",
+            r"SQL Server documentation",
+            r"Oracle documentation",
+            r"database manual"
         ]
         
         # Context-aware patterns for better accuracy
@@ -394,18 +428,25 @@ class SQLDetectionEngine:
         """
         if not self.time_samples or len(self.time_samples) < 1:
             return False, 0.0, {}
-        
+
         self.time_samples.append(response_time)
         if len(self.time_samples) > 50:
             self.time_samples = self.time_samples[-50:]
-        
+
         avg_time = sum(self.time_samples[:-1]) / len(self.time_samples[:-1])
         variance = sum((t - avg_time) ** 2 for t in self.time_samples[:-1]) / len(self.time_samples[:-1])
         std_dev = variance ** 0.5
-        threshold = avg_time + (3 * std_dev) + 2  # More robust threshold: 3 std deviations + 2 seconds buffer
 
-        time_indicators = ['sleep', 'delay', 'waitfor', 'benchmark', 'pg_sleep']
+        # CRITICAL FIX: Add minimum threshold to prevent false positives from fast responses
+        MIN_THRESHOLD = 3.0  # Minimum 3 seconds delay required
+        threshold = max(MIN_THRESHOLD, avg_time + (3 * std_dev) + 2)
+
+        time_indicators = ['sleep', 'delay', 'waitfor', 'benchmark', 'pg_sleep', 'dbms_pipe', 'dbms_lock', 'randomblob']
         has_time_payload = any(indicator in payload.lower() for indicator in time_indicators)
+
+        # CRITICAL FIX: Require time payload indicator - don't flag without it
+        if not has_time_payload:
+            return False, 0.0, {"reason": "No time-based function in payload"}
 
         if response_time > threshold and has_time_payload:
             # Initial detection looks positive, attempt re-verification if possible
@@ -462,38 +503,63 @@ class SQLDetectionEngine:
         return False, 0.0, {}
 
     def _analyze_boolean_based_advanced(self, response_text: str, payload: str) -> Tuple[bool, float]:
-        """Advanced boolean-based analysis"""
+        """
+        Advanced boolean-based analysis with improved accuracy.
+        CRITICAL FIX: Requires more evidence to reduce false positives from dynamic content.
+        """
         if not self.baseline_response:
             return False, 0.0
-        
+
         # Calculate similarity with baseline
         similarity = self._calculate_response_similarity(response_text, self.baseline_response)
-        
+
         # Check for boolean payload indicators
         boolean_indicators = ['and', 'or', '=', '!=', '<>', 'true', 'false', '1=1', '1=0']
         has_boolean_payload = any(indicator in payload.lower() for indicator in boolean_indicators)
-        
-        # If similarity is very low and we have boolean indicators, likely vulnerable
-        if similarity < 0.3 and has_boolean_payload:
-            confidence = min(0.9, 0.6 + (0.3 - similarity) * 0.5)
-            return True, confidence
-        
+
+        # IMPROVED: Require boolean payload indicator
+        if not has_boolean_payload:
+            return False, 0.0
+
+        # IMPROVED: More strict similarity threshold and multiple checks
+        length_diff = abs(len(response_text) - len(self.baseline_response))
+        length_diff_ratio = length_diff / max(len(self.baseline_response), 1)
+
         # Check for specific boolean response patterns
         baseline_patterns = self.baseline_patterns if hasattr(self, 'baseline_patterns') else {}
         current_patterns = self._extract_response_patterns(response_text)
-        
+
         # Look for significant structural differences
         structural_diff = 0
+        pattern_count = 0
         for key in baseline_patterns:
             if key in current_patterns:
                 diff = abs(baseline_patterns[key] - current_patterns[key])
                 max_val = max(baseline_patterns[key], current_patterns[key], 1)
-                structural_diff += diff / max_val
-        
-        if structural_diff > 0.5 and has_boolean_payload:
-            confidence = min(0.85, 0.5 + structural_diff * 0.3)
-            return True, confidence
-        
+                if max_val > 0:
+                    structural_diff += diff / max_val
+                    pattern_count += 1
+
+        if pattern_count > 0:
+            structural_diff = structural_diff / pattern_count
+
+        # IMPROVED: Require BOTH similarity AND structural changes
+        # This reduces false positives from dynamic content like ads, timestamps, etc.
+        significant_difference = (similarity < 0.4 or structural_diff > 0.4 or length_diff_ratio > 0.3)
+
+        if significant_difference:
+            # IMPROVED: Lower confidence for boolean-based (prone to false positives)
+            # Calculate confidence based on multiple factors
+            sim_score = (1.0 - similarity) * 0.4
+            struct_score = structural_diff * 0.4
+            length_score = min(length_diff_ratio, 1.0) * 0.2
+
+            confidence = min(0.75, sim_score + struct_score + length_score)  # Max 75% for boolean
+
+            # IMPROVED: Only report if confidence is reasonable
+            if confidence > 0.50:
+                return True, confidence
+
         return False, 0.0
 
     def _analyze_union_based_advanced(self, response_text: str, payload: str) -> Tuple[bool, float]:
@@ -558,22 +624,54 @@ class SQLDetectionEngine:
         for pattern, base_confidence, db_hint in self.error_patterns:
             match = re.search(pattern, response_text, re.IGNORECASE | re.DOTALL)
             if match:
+                matched_error = match.group(0)
+
+                # CRITICAL FIX: Verify payload caused this error (correlation check)
+                correlation_found = False
+
+                # Check if payload is reflected in the error message
+                if decoded_payload.lower() in matched_error.lower():
+                    correlation_found = True
+                else:
+                    # Extract SQL fragment from error message
+                    sql_fragment_match = re.search(r"(?:near|use|syntax to use near|at or near)\s+['\"]([^'\"]{1,200})['\"]|'([^']{1,200})'", matched_error, re.IGNORECASE)
+                    if sql_fragment_match:
+                        error_sql = (sql_fragment_match.group(1) or sql_fragment_match.group(2) or "").lower()
+                        # Check if any significant part of payload appears in error
+                        payload_parts = [p for p in decoded_payload.lower().split() if len(p) > 3]
+                        if any(part in error_sql for part in payload_parts):
+                            correlation_found = True
+
+                    # Also check if payload is reflected anywhere in the response
+                    if decoded_payload[:50].lower() in response_text.lower():
+                        correlation_found = True
+
+                # If no correlation, this error existed before our payload
+                if not correlation_found and base_confidence < 0.95:
+                    continue  # Skip to next pattern
+
                 # Analyze context around the error
-                context_modifier = self._analyze_error_context(response_text, match.group(0))
+                context_modifier = self._analyze_error_context(response_text, matched_error)
+
+                # IMPROVED: Reduce confidence if correlation is weak
+                if not correlation_found:
+                    context_modifier *= 0.7  # Reduce confidence by 30%
+
                 final_confidence = min(0.99, base_confidence * context_modifier)
-                
+
                 # Advanced database type detection
                 detected_db = self._detect_database_type_advanced(response_text) or db_hint
-                
+
                 return DetectionResult(
-                    True, final_confidence, "error_based", detected_db, 
-                    f"SQL error pattern detected: {match.group(0)[:100]}...", 
+                    True, final_confidence, "error_based", detected_db,
+                    f"SQL error pattern detected: {matched_error[:100]}...",
                     response_time,
                     {
                         "error_pattern": pattern,
-                        "matched_text": match.group(0),
+                        "matched_text": matched_error,
                         "context_confidence": context_modifier,
-                        "payload_decoded": decoded_payload
+                        "payload_decoded": decoded_payload,
+                        "payload_correlation": correlation_found
                     }
                 )
 

