@@ -164,6 +164,7 @@ class SQLInjectionTool:
         self.tamper_script = tk.StringVar()
         self.scan_running = False
         self.scan_paused = False
+        self.current_scan_mode = 'single'  # Track which scan is running: 'single' or 'multi'
         self.scan_results = []
         self.valid_domains_to_scan = []
         
@@ -1498,6 +1499,8 @@ Complexity: {'High' if len(payloads) > 50 else 'Medium' if len(payloads) > 20 el
     def run_single_scan(self, url, param, injection_types):
         """Run the actual single target scan"""
         try:
+            # FIXED: Set scan mode to 'single' so logs go to correct tab
+            self.current_scan_mode = 'single'
             self.progress_var.set(0)
 
             # CRITICAL FIX: Establish baseline response BEFORE testing payloads
@@ -1607,9 +1610,11 @@ Complexity: {'High' if len(payloads) > 50 else 'Medium' if len(payloads) > 20 el
     def run_multi_scan(self, domains, injection_types):
         """Run multiple target scan"""
         try:
+            # FIXED: Set scan mode to 'multi' so logs go to correct tab
+            self.current_scan_mode = 'multi'
             completed = 0
             total_vulnerabilities = 0
-            
+
             for i, domain in enumerate(domains):
                 if not self.scan_running:
                     break
@@ -1739,10 +1744,19 @@ Complexity: {'High' if len(payloads) > 50 else 'Medium' if len(payloads) > 20 el
             return None
     
     def log_result(self, message):
-        """Log a result to the results text area"""
+        """Log a result to the appropriate results text area based on scan mode"""
         timestamp = datetime.now().strftime("%H:%M:%S")
-        self.results_text.insert(tk.END, f"[{timestamp}] {message}\n")
-        self.results_text.see(tk.END)
+
+        # FIXED: Route logs to the correct tab based on which scan is running
+        if self.current_scan_mode == 'multi':
+            # If multi-scan is running, log to multi-scan results
+            self.multi_results_text.insert(tk.END, f"[{timestamp}] {message}\n")
+            self.multi_results_text.see(tk.END)
+        else:
+            # Default: log to single target results
+            self.results_text.insert(tk.END, f"[{timestamp}] {message}\n")
+            self.results_text.see(tk.END)
+
         self.root.update_idletasks()
     
     def log_multi_result(self, message):
