@@ -318,22 +318,13 @@ class SQLInjectionTool:
         delay_scale.pack(fill='x', padx=5, pady=(0, 5))
         
         # Request Timeout
-        tk.Label(settings_frame, text="Request Timeout (s):", 
+        tk.Label(settings_frame, text="Request Timeout (s):",
                 bg=self.colors['frame_bg'], fg=self.colors['fg']).pack(anchor='w', padx=5, pady=(5, 2))
-        timeout_scale = tk.Scale(settings_frame, from_=5, to=30, orient='horizontal', 
+        timeout_scale = tk.Scale(settings_frame, from_=5, to=30, orient='horizontal',
                                variable=self.request_timeout,
-                               bg=self.colors['frame_bg'], fg=self.colors['fg'], 
+                               bg=self.colors['frame_bg'], fg=self.colors['fg'],
                                highlightbackground=self.colors['frame_bg'])
         timeout_scale.pack(fill='x', padx=5, pady=(0, 5))
-        
-        # Threads
-        tk.Label(settings_frame, text="Threads:", 
-                bg=self.colors['frame_bg'], fg=self.colors['fg']).pack(anchor='w', padx=5, pady=(5, 2))
-        thread_scale = tk.Scale(settings_frame, from_=1, to=10, orient='horizontal', 
-                              variable=self.threads,
-                              bg=self.colors['frame_bg'], fg=self.colors['fg'], 
-                              highlightbackground=self.colors['frame_bg'])
-        thread_scale.pack(fill='x', padx=5, pady=(0, 5))
         
         # Right panel - Statistics and Results
         right_panel = tk.Frame(content_frame, bg=self.colors['bg'])
