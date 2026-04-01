@@ -1,0 +1,35 @@
+# ═══════════════════════════════════════════════════════════
+# SQL-Tester Configuration
+# These are default values. GUI settings override at runtime.
+# ═══════════════════════════════════════════════════════════
+
+scanning:
+  mode: sync            # sync | async (async available in future)
+  concurrency: 10       # Max concurrent requests (async mode)
+  timeout: 10           # Request timeout in seconds
+  retry: 3              # Retry attempts on failure
+  delay: 1.0            # Delay between requests (seconds)
+  max_payloads_per_run: 50  # Limit payloads in quick scan mode
+
+detection:
+  confidence_threshold: 0.75
+  false_positive_filter: true
+  enable_reverification: true
+  time_based_min_delay: 3
+
+proxy:
+  enabled: false
+  type: http            # http | socks5
+  host: 127.0.0.1
+  port: 9050
+
+user_agent:
+  rotate: true
+  custom_agents_file: null
+
+output:
+  log_level: INFO       # DEBUG | INFO | WARNING | ERROR
+  log_to_file: true
+  log_file: sqltester.log
+  save_responses: false
+  output_dir: ./results
