@@ -1,11 +1,14 @@
 import re
 import time
 import hashlib
+import logging
 from typing import Dict, List, Tuple, Optional
 from urllib.parse import unquote, urlparse, parse_qs, urlencode, urlunparse
 import difflib
 import requests
 from user_agent import UserAgentManager
+
+logger = logging.getLogger("sqltester.engine")
 
 class DetectionResult:
     def __init__(self, vulnerable, confidence, detection_type, database_type, error_message, response_time, additional_info=None):
@@ -32,63 +35,6 @@ class SQLDetectionEngine:
         self.response_patterns = {}
         self.time_samples = []
 
-    def detect_waf(self, url: str, timeout: int = 10) -> Tuple[bool, str]:
-        """
-        Proactively detects the presence of a Web Application Firewall (WAF).
-        Sends a benign but suspicious probe and checks for WAF-like responses.
-        """
-        waf_probes = [
-            "' OR 1=1 --",
-            "<script>alert('XSS')</script>",
-            "UNION SELECT NULL,NULL,NULL--",
-            "../etc/passwd"
-        ]
-        waf_indicators = [
-            'firewall', 'blocked', 'forbidden', 'incapsula', 'cloudflare',
-            'akamai', 'barracuda', 'f5', 'imperva', 'sucuri', 'wordfence'
-        ]
-
-        try:
-            # Get a clean baseline response first
-            headers = self.user_agent_manager.get_realistic_headers()
-            response = requests.get(url, headers=headers, timeout=timeout)
-            baseline_status = response.status_code
-
-            # Now send a malicious-looking probe
-            parsed_url = urlparse(url)
-            params = parse_qs(parsed_url.query)
-            if not params:
-                # If no params, add a dummy one
-                test_url = url + "?id=" + requests.utils.quote(waf_probes[0])
-            else:
-                # Add payload to the first parameter
-                param_key = list(params.keys())[0]
-                params[param_key] = [params[param_key][0] + waf_probes[0]]
-                new_query = urlencode(params, doseq=True)
-                test_url = urlunparse(parsed_url._replace(query=new_query))
-
-            response = requests.get(test_url, headers=headers, timeout=timeout)
-
-            # 1. Check for a change in status code, especially to a blocking one
-            if response.status_code != baseline_status and response.status_code in [403, 406, 429, 503]:
-                return (True, f"Status code changed from {baseline_status} to {response.status_code} on probe.")
-
-            # 2. Check response body for WAF indicators
-            response_text = response.text.lower()
-            for indicator in waf_indicators:
-                if indicator in response_text:
-                    return (True, f"Found WAF indicator keyword: '{indicator}' in response.")
-
-            # 3. Check for generic blocking pages
-            if "access denied" in response_text or "attack detected" in response_text:
-                return (True, "Generic blocking page detected in response.")
-
-        except requests.exceptions.RequestException as e:
-            # Network errors might hide a WAF, but we can't be certain.
-            return (False, f"Could not complete WAF check due to network error: {e}")
-
-        return (False, "No clear WAF indicators found.")
-        
         # Enhanced error patterns with context awareness and severity scoring
         self.error_patterns = [
             # MySQL - High Confidence Patterns
@@ -271,6 +217,63 @@ class SQLDetectionEngine:
             ]
         }
 
+    def detect_waf(self, url: str, timeout: int = 10) -> Tuple[bool, str]:
+        """
+        Proactively detects the presence of a Web Application Firewall (WAF).
+        Sends a benign but suspicious probe and checks for WAF-like responses.
+        """
+        waf_probes = [
+            "' OR 1=1 --",
+            "<script>alert('XSS')</script>",
+            "UNION SELECT NULL,NULL,NULL--",
+            "../etc/passwd"
+        ]
+        waf_indicators = [
+            'firewall', 'blocked', 'forbidden', 'incapsula', 'cloudflare',
+            'akamai', 'barracuda', 'f5', 'imperva', 'sucuri', 'wordfence'
+        ]
+
+        try:
+            # Get a clean baseline response first
+            headers = self.user_agent_manager.get_realistic_headers()
+            response = requests.get(url, headers=headers, timeout=timeout)
+            baseline_status = response.status_code
+
+            # Now send a malicious-looking probe
+            parsed_url = urlparse(url)
+            params = parse_qs(parsed_url.query)
+            if not params:
+                # If no params, add a dummy one
+                test_url = url + "?id=" + requests.utils.quote(waf_probes[0])
+            else:
+                # Add payload to the first parameter
+                param_key = list(params.keys())[0]
+                params[param_key] = [params[param_key][0] + waf_probes[0]]
+                new_query = urlencode(params, doseq=True)
+                test_url = urlunparse(parsed_url._replace(query=new_query))
+
+            response = requests.get(test_url, headers=headers, timeout=timeout)
+
+            # 1. Check for a change in status code, especially to a blocking one
+            if response.status_code != baseline_status and response.status_code in [403, 406, 429, 503]:
+                return (True, f"Status code changed from {baseline_status} to {response.status_code} on probe.")
+
+            # 2. Check response body for WAF indicators
+            response_text = response.text.lower()
+            for indicator in waf_indicators:
+                if indicator in response_text:
+                    return (True, f"Found WAF indicator keyword: '{indicator}' in response.")
+
+            # 3. Check for generic blocking pages
+            if "access denied" in response_text or "attack detected" in response_text:
+                return (True, "Generic blocking page detected in response.")
+
+        except requests.exceptions.RequestException as e:
+            # Network errors might hide a WAF, but we can't be certain.
+            return (False, f"Could not complete WAF check due to network error: {e}")
+
+        return (False, "No clear WAF indicators found.")
+
     def set_baseline(self, baseline_response, baseline_time):
         """Enhanced baseline setting with multiple metrics"""
         self.baseline_response = baseline_response
@@ -401,7 +404,162 @@ class SQLDetectionEngine:
         if form_context:
             confidence_modifier += 0.05
         
+        # Batch 3: Enhanced — check if error is NEW (not in baseline)
+        if self.baseline_response:
+            baseline_lower = self.baseline_response.lower()
+            error_lower = error_match.lower()
+            if error_lower in baseline_lower:
+                # Error already existed in baseline — likely not caused by payload
+                confidence_modifier *= 0.3
+            else:
+                # Error is NEW — strong indicator of injection
+                confidence_modifier += 0.15
+        
         return min(confidence_modifier, 1.5)  # Cap at 1.5x
+
+    # ═══════════════════════════════════════════════════════════
+    # Batch 3: Second-Order SQLi Detection
+    # ═══════════════════════════════════════════════════════════
+
+    def _analyze_second_order(self, response_text: str, payload: str) -> Tuple[bool, float, Dict]:
+        """
+        Detect indicators of second-order SQL injection.
+        Second-order SQLi occurs when injected data is stored and later
+        triggered in a different context (e.g., profile view, admin panel).
+        """
+        indicators_found: list[str] = []
+        confidence = 0.0
+
+        decoded_payload = unquote(payload)
+
+        # 1. Check if payload is reflected back (stored and displayed)
+        if decoded_payload in response_text:
+            indicators_found.append("payload_reflected")
+            confidence += 0.25
+
+        # 2. Check for storage confirmation patterns
+        storage_patterns = [
+            (r"(?:saved|stored|inserted|updated|created)\s+successfully", 0.15),
+            (r"(?:record|entry|row|data)\s+(?:added|saved|updated)", 0.15),
+            (r"(?:thank you|success|submitted)", 0.05),
+            (r"(?:profile|account|settings)\s+(?:updated|saved)", 0.15),
+        ]
+        for pattern, score in storage_patterns:
+            if re.search(pattern, response_text, re.IGNORECASE):
+                indicators_found.append(f"storage_confirm:{pattern[:30]}")
+                confidence += score
+
+        # 3. Check if SQL metacharacters survived (not sanitized)
+        sql_meta_chars = ["'", '"', ';', '--', '/*', '*/']
+        meta_survived = 0
+        for char in sql_meta_chars:
+            if char in decoded_payload and char in response_text:
+                meta_survived += 1
+        if meta_survived >= 2:
+            indicators_found.append(f"meta_chars_survived:{meta_survived}")
+            confidence += 0.2
+
+        # 4. Check for SQL error on retrieval (the actual trigger)
+        for pattern, base_conf, db_hint in self.error_patterns:
+            if re.search(pattern, response_text, re.IGNORECASE):
+                indicators_found.append(f"error_on_retrieval:{db_hint}")
+                confidence += 0.3
+                break
+
+        # Threshold: need at least 2 indicators
+        is_vulnerable = len(indicators_found) >= 2 and confidence >= 0.35
+        final_confidence = min(confidence, 0.85)  # Cap at 85% (needs manual verification)
+
+        return is_vulnerable, final_confidence, {
+            "indicators": indicators_found,
+            "note": "Second-order SQLi requires manual verification of stored payload trigger"
+        }
+
+    # ═══════════════════════════════════════════════════════════
+    # Batch 3: NoSQL Injection Detection
+    # ═══════════════════════════════════════════════════════════
+
+    def _analyze_nosql(self, response_text: str, payload: str) -> Tuple[bool, float, Dict]:
+        """
+        Detect NoSQL injection vulnerabilities (MongoDB, CouchDB, etc.).
+        """
+        indicators_found: list[str] = []
+        confidence = 0.0
+        detected_db = "nosql"
+
+        decoded_payload = unquote(payload)
+
+        # 1. MongoDB error patterns
+        mongo_error_patterns = [
+            (r"MongoError", 0.95, "mongodb"),
+            (r"MongoDB.*error", 0.90, "mongodb"),
+            (r"\$where.*not.*allowed", 0.88, "mongodb"),
+            (r"SyntaxError.*unexpected token", 0.70, "mongodb"),
+            (r"\$[a-z]+.*is.*not.*valid", 0.85, "mongodb"),
+            (r"cannot apply.*\$[a-z]+", 0.85, "mongodb"),
+            (r"unknown.*operator.*\$", 0.85, "mongodb"),
+            (r"\$where.*is.*not.*allowed", 0.90, "mongodb"),
+            (r"Cast.*failed.*ObjectId", 0.80, "mongodb"),
+            (r"E11000.*duplicate key error", 0.75, "mongodb"),
+        ]
+
+        for pattern, conf, db in mongo_error_patterns:
+            if re.search(pattern, response_text, re.IGNORECASE):
+                indicators_found.append(f"mongo_error:{pattern[:30]}")
+                confidence = max(confidence, conf)
+                detected_db = db
+
+        # 2. CouchDB error patterns
+        couch_patterns = [
+            (r"CouchDB", 0.85, "couchdb"),
+            (r"reason.*bad_request", 0.80, "couchdb"),
+            (r"error.*not_found", 0.60, "couchdb"),
+        ]
+
+        for pattern, conf, db in couch_patterns:
+            if re.search(pattern, response_text, re.IGNORECASE):
+                indicators_found.append(f"couch_error:{pattern[:30]}")
+                confidence = max(confidence, conf)
+                detected_db = db
+
+        # 3. Check for NoSQL operator indicators in payload
+        nosql_operators = ['$where', '$ne', '$gt', '$lt', '$gte', '$lte',
+                           '$regex', '$in', '$nin', '$or', '$and', '$not',
+                           '$exists', '$expr', '$text']
+        has_nosql_payload = any(op in decoded_payload for op in nosql_operators)
+
+        if not has_nosql_payload and not indicators_found:
+            return False, 0.0, {}
+
+        # 4. Check for data leakage (successful injection)
+        data_leak_patterns = [
+            (r"_id.*ObjectId", 0.85),
+            (r"\{\s*\"_id\"\s*:", 0.80),
+            (r"\"password\"\s*:\s*\"", 0.90),
+            (r"\"admin\"\s*:\s*true", 0.85),
+            (r"\"role\"\s*:\s*\"admin\"", 0.85),
+        ]
+
+        for pattern, conf in data_leak_patterns:
+            if re.search(pattern, response_text, re.IGNORECASE):
+                indicators_found.append(f"data_leak:{pattern[:30]}")
+                confidence = max(confidence, conf)
+
+        # 5. Boolean-style NoSQL check: response differs significantly from baseline
+        if self.baseline_response and has_nosql_payload:
+            similarity = self._calculate_response_similarity(response_text, self.baseline_response)
+            if similarity < 0.5:
+                indicators_found.append(f"response_diff:similarity={similarity:.2f}")
+                confidence = max(confidence, 0.65)
+
+        is_vulnerable = confidence >= 0.60 and len(indicators_found) >= 1
+        final_confidence = min(confidence, 0.95)
+
+        return is_vulnerable, final_confidence, {
+            "indicators": indicators_found,
+            "detected_db": detected_db,
+            "nosql_payload": has_nosql_payload
+        }
 
     def _detect_database_type_advanced(self, response_text: str) -> Optional[str]:
         """Advanced database type detection with confidence scoring"""
@@ -724,8 +882,32 @@ class SQLDetectionEngine:
                     }
                 )
 
+        # Second-Order SQLi detection (Batch 3)
+        if injection_type == "second_order":
+            is_vulnerable, confidence, info = self._analyze_second_order(response_text, decoded_payload)
+            if is_vulnerable:
+                return DetectionResult(
+                    True, confidence, injection_type,
+                    self._detect_database_type_advanced(response_text),
+                    "Potential second-order SQL injection detected",
+                    response_time,
+                    {"payload_decoded": decoded_payload, **info}
+                )
+
+        # NoSQL injection detection (Batch 3)
+        if injection_type == "nosql":
+            is_vulnerable, confidence, info = self._analyze_nosql(response_text, decoded_payload)
+            if is_vulnerable:
+                return DetectionResult(
+                    True, confidence, injection_type,
+                    info.get("detected_db", "nosql"),
+                    "NoSQL injection vulnerability detected",
+                    response_time,
+                    {"payload_decoded": decoded_payload, **info}
+                )
+
         # Advanced heuristic analysis for other injection types
-        if injection_type in ["advanced", "bypass", "json"]:
+        if injection_type in ["advanced", "bypass", "json", "stacked", "auth_bypass", "filter_evasion"]:
             # Check for subtle indicators
             subtle_indicators = [
                 (r"Warning.*mysql", 0.75, "mysql"),
@@ -774,6 +956,9 @@ class SQLDetectionEngine:
 
 if __name__ == "__main__":
     # Test the enhanced detection engine
+    from config import get_logger
+    test_logger = get_logger("engine.test")
+    
     engine = SQLDetectionEngine()
     engine.set_baseline("Sample baseline response", 0.5)
     
@@ -782,5 +967,5 @@ if __name__ == "__main__":
         "You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near ''test'' at line 1", 
         "' OR 1=1 --", 1.0, "error_based"
     )
-    print(f"Test Result: {result}")
-    print(f"Vulnerable: {result.vulnerable}, Confidence: {result.confidence:.2f}")
+    test_logger.info(f"Test Result: {result}")
+    test_logger.info(f"Vulnerable: {result.vulnerable}, Confidence: {result.confidence:.2f}")
