@@ -1,2 +1,9 @@
-node_modules/
+__pycache__/
+*.pyc
+*.pyo
+*.log
+*.PNG
+*.png
 .env
+node_modules/
+config.json
