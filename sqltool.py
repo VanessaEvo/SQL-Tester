@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 SQL Injection Testing Tool
-Educational Use Only - 2025
+Educational Use Only - 2026.0
 """
 
 import tkinter as tk
@@ -25,6 +25,8 @@ from tamper import get_tamper_scripts
 from engine import SQLDetectionEngine, DetectionResult
 from report import ReportGenerator
 from user_agent import UserAgentManager
+from session import SessionManager
+from proxy import ProxyManager
 
 class ScrollableFrame(tk.Frame):
     """
@@ -93,7 +95,7 @@ class SQLInjectionTool:
         
     def setup_window(self):
         """Configure the main window"""
-        self.root.title("Professional SQL Injection Testing Tool - 2025 Edition")
+        self.root.title("Professional SQL Injection Testing Tool - 2026 Edition")
         self.root.geometry("1200x800")
         self.root.minsize(1000, 700)
         
@@ -157,7 +159,12 @@ class SQLInjectionTool:
             'advanced': tk.BooleanVar(value=False),
             'bypass': tk.BooleanVar(value=False),
             'json': tk.BooleanVar(value=False),
-            'nosql': tk.BooleanVar(value=False)
+            'nosql': tk.BooleanVar(value=False),
+            # Batch 2/3 new categories
+            'stacked': tk.BooleanVar(value=False),
+            'auth_bypass': tk.BooleanVar(value=False),
+            'filter_evasion': tk.BooleanVar(value=False),
+            'second_order': tk.BooleanVar(value=False)
         }
         
         # Scan control variables
@@ -169,6 +176,15 @@ class SQLInjectionTool:
         self.scan_results = []
         self.valid_domains_to_scan = []
         self.results_lock = threading.Lock()  # Thread-safe lock for updating shared data
+        
+        # Session & Proxy variables
+        self.session_cookies = tk.StringVar()
+        self.session_auth_token = tk.StringVar()
+        self.session_auth_type = tk.StringVar(value="Bearer")
+        self.use_session = tk.BooleanVar(value=False)
+        self.proxy_url = tk.StringVar()
+        self.proxy_rotation = tk.StringVar(value="round_robin")
+        self.use_proxy = tk.BooleanVar(value=False)
         
         # Statistics variables
         self.stats = {
@@ -184,6 +200,8 @@ class SQLInjectionTool:
         self.detection_engine = SQLDetectionEngine()
         self.report_generator = ReportGenerator()
         self.user_agent_manager = UserAgentManager()
+        self.session_manager = SessionManager()
+        self.proxy_manager = ProxyManager()
         
     def create_interface(self):
         """Create the main interface"""
@@ -257,7 +275,9 @@ class SQLInjectionTool:
             ('basic', 'Basic'), ('union', 'Union'), ('boolean', 'Boolean'), 
             ('time_based', 'Time-based'), ('error_based', 'Error-based'), 
             ('advanced', 'Advanced'), ('bypass', 'Bypass'), ('json', 'JSON'),
-            ('nosql', 'NoSQL Injection')
+            ('nosql', 'NoSQL'), ('stacked', 'Stacked'),
+            ('auth_bypass', 'Auth Bypass'), ('filter_evasion', 'Filter Evasion'),
+            ('second_order', 'Second-Order')
         ]
         
         for i, (key, label) in enumerate(injection_items):
@@ -266,12 +286,10 @@ class SQLInjectionTool:
                               bg=self.colors['frame_bg'], fg=self.colors['fg'], 
                               selectcolor=self.colors['entry_bg'])
             cb.grid(row=row, column=col, sticky='w', padx=5, pady=2)
-            if key == 'nosql':
-                cb.config(state='disabled')
         
         # Quick selection buttons
         btn_frame = tk.Frame(injection_frame, bg=self.colors['frame_bg'])
-        btn_frame.grid(row=5, column=0, columnspan=2, pady=5)
+        btn_frame.grid(row=7, column=0, columnspan=2, pady=5)
         
         tk.Button(btn_frame, text="Select All", command=self.select_all_injections,
                  bg=self.colors['success'], fg=self.colors['button_fg'], 
@@ -325,6 +343,65 @@ class SQLInjectionTool:
                                bg=self.colors['frame_bg'], fg=self.colors['fg'],
                                highlightbackground=self.colors['frame_bg'])
         timeout_scale.pack(fill='x', padx=5, pady=(0, 5))
+        
+        # Session Settings
+        session_frame = tk.LabelFrame(left_panel, text="🔑 Session & Auth", 
+                                     bg=self.colors['frame_bg'], fg=self.colors['fg'])
+        session_frame.pack(fill='x', padx=10, pady=5)
+        
+        tk.Checkbutton(session_frame, text="Enable Session", variable=self.use_session,
+                      bg=self.colors['frame_bg'], fg=self.colors['fg'],
+                      selectcolor=self.colors['entry_bg']).pack(anchor='w', padx=5, pady=(5, 2))
+        
+        tk.Label(session_frame, text="Cookies (key=val; key2=val2):",
+                bg=self.colors['frame_bg'], fg=self.colors['fg'],
+                font=('Arial', 8)).pack(anchor='w', padx=5, pady=(2, 0))
+        tk.Entry(session_frame, textvariable=self.session_cookies,
+                bg=self.colors['entry_bg'], fg=self.colors['entry_fg'],
+                font=('Consolas', 8)).pack(fill='x', padx=5, pady=(0, 3))
+        
+        auth_row = tk.Frame(session_frame, bg=self.colors['frame_bg'])
+        auth_row.pack(fill='x', padx=5, pady=(0, 3))
+        ttk.Combobox(auth_row, textvariable=self.session_auth_type,
+                    values=['Bearer', 'Basic', 'Token'], state='readonly',
+                    width=8).pack(side='left', padx=(0, 3))
+        tk.Entry(auth_row, textvariable=self.session_auth_token,
+                bg=self.colors['entry_bg'], fg=self.colors['entry_fg'],
+                font=('Consolas', 8)).pack(side='left', fill='x', expand=True)
+        
+        # Proxy Settings
+        proxy_frame = tk.LabelFrame(left_panel, text="🌐 Proxy", 
+                                   bg=self.colors['frame_bg'], fg=self.colors['fg'])
+        proxy_frame.pack(fill='x', padx=10, pady=5)
+        
+        tk.Checkbutton(proxy_frame, text="Enable Proxy", variable=self.use_proxy,
+                      bg=self.colors['frame_bg'], fg=self.colors['fg'],
+                      selectcolor=self.colors['entry_bg']).pack(anchor='w', padx=5, pady=(5, 2))
+        
+        tk.Label(proxy_frame, text="Single Proxy (http://host:port):",
+                bg=self.colors['frame_bg'], fg=self.colors['fg'],
+                font=('Arial', 8)).pack(anchor='w', padx=5, pady=(2, 0))
+        tk.Entry(proxy_frame, textvariable=self.proxy_url,
+                bg=self.colors['entry_bg'], fg=self.colors['entry_fg'],
+                font=('Consolas', 8)).pack(fill='x', padx=5, pady=(0, 3))
+        
+        proxy_list_row = tk.Frame(proxy_frame, bg=self.colors['frame_bg'])
+        proxy_list_row.pack(fill='x', padx=5, pady=(0, 3))
+        tk.Button(proxy_list_row, text="📁 Load Proxy List", command=self.load_proxy_file,
+                 bg=self.colors['accent'], fg=self.colors['button_fg'],
+                 font=('Arial', 8)).pack(side='left', padx=(0, 5))
+        self.proxy_count_label = tk.Label(proxy_list_row, text="No proxies loaded",
+                bg=self.colors['frame_bg'], fg=self.colors['fg'],
+                font=('Arial', 8))
+        self.proxy_count_label.pack(side='left')
+        
+        rotation_row = tk.Frame(proxy_frame, bg=self.colors['frame_bg'])
+        rotation_row.pack(fill='x', padx=5, pady=(0, 5))
+        tk.Label(rotation_row, text="Rotation:", bg=self.colors['frame_bg'],
+                fg=self.colors['fg'], font=('Arial', 8)).pack(side='left')
+        ttk.Combobox(rotation_row, textvariable=self.proxy_rotation,
+                    values=['round_robin', 'random', 'sticky'], state='readonly',
+                    width=12).pack(side='left', padx=3)
         
         # Right panel - Statistics and Results
         right_panel = tk.Frame(content_frame, bg=self.colors['bg'])
@@ -429,9 +506,10 @@ class SQLInjectionTool:
         content_frame = tk.Frame(main_container, bg=self.colors['bg'])
         content_frame.pack(fill='both', expand=True, padx=10, pady=10)
         
-        # Left side - Domain Management and Settings
-        left_side = tk.Frame(content_frame, bg=self.colors['bg'])
-        left_side.pack(side='left', fill='both', expand=True, padx=(0, 5))
+        # Left side - Domain Management and Settings (scrollable)
+        left_scroll = ScrollableFrame(content_frame, bg=self.colors['bg'])
+        left_scroll.pack(side='left', fill='both', expand=True, padx=(0, 5))
+        left_side = left_scroll.scrollable_frame
         
         # Domain Management Panel
         domain_frame = tk.LabelFrame(left_side, text="🌐 Domain Management", 
@@ -440,26 +518,22 @@ class SQLInjectionTool:
         domain_frame.pack(fill='both', expand=True, pady=(0, 10))
         
         # File operations
-        file_frame = tk.Frame(domain_frame, bg=self.colors['frame_bg'])
-        file_frame.pack(fill='x', padx=10, pady=10)
+        file_row = tk.Frame(domain_frame, bg=self.colors['frame_bg'])
+        file_row.pack(fill='x', padx=10, pady=(10, 5))
         
-        tk.Label(file_frame, text="📁 Load domains from file:", 
-                bg=self.colors['frame_bg'], fg=self.colors['fg'], 
-                font=('Arial', 10)).pack(side='left')
-        
-        tk.Button(file_frame, text="📁 Load File", command=self.load_domains_file,
+        tk.Button(file_row, text="📁 Load File", command=self.load_domains_file,
                  bg=self.colors['accent'], fg=self.colors['button_fg'], 
-                 font=('Arial', 9)).pack(side='left', padx=10)
+                 font=('Arial', 9)).pack(side='left', padx=(0, 5))
         
-        tk.Button(file_frame, text="💾 Save Domains", command=self.save_domains_file,
+        tk.Button(file_row, text="💾 Save Domains", command=self.save_domains_file,
                  bg=self.colors['success'], fg=self.colors['button_fg'], 
                  font=('Arial', 9)).pack(side='left', padx=5)
-        
-        tk.Button(file_frame, text="✅ Validate Domains", command=self.validate_domains,
+
+        tk.Button(file_row, text="✅ Validate", command=self.validate_domains,
                  bg=self.colors['warning'], fg=self.colors['button_fg'], 
                  font=('Arial', 9)).pack(side='left', padx=5)
 
-        tk.Button(file_frame, text="🗑️ Clear", command=self.clear_domain_list,
+        tk.Button(file_row, text="🗑️ Clear", command=self.clear_domain_list,
                  bg=self.colors['danger'], fg=self.colors['button_fg'],
                  font=('Arial', 9)).pack(side='left', padx=5)
         
@@ -493,37 +567,119 @@ http://demo.site/user.php?user_id=456
         
         # Settings in a grid layout
         settings_grid = tk.Frame(multi_settings_frame, bg=self.colors['frame_bg'])
-        settings_grid.pack(fill='x', padx=10, pady=10)
+        settings_grid.pack(fill='x', padx=10, pady=5)
         
         # Request Delay
         tk.Label(settings_grid, text="Request Delay (s):", 
-                bg=self.colors['frame_bg'], fg=self.colors['fg']).grid(row=0, column=0, sticky='w', padx=5, pady=2)
+                bg=self.colors['frame_bg'], fg=self.colors['fg']).grid(row=0, column=0, sticky='w', padx=5, pady=0)
         delay_scale_multi = tk.Scale(settings_grid, from_=0.1, to=5.0, resolution=0.1, 
                                    orient='horizontal', variable=self.request_delay,
                                    bg=self.colors['frame_bg'], fg=self.colors['fg'], 
                                    highlightbackground=self.colors['frame_bg'], length=150)
-        delay_scale_multi.grid(row=0, column=1, sticky='ew', padx=5, pady=2)
+        delay_scale_multi.grid(row=0, column=1, sticky='ew', padx=5, pady=0)
         
         # Request Timeout
         tk.Label(settings_grid, text="Request Timeout (s):", 
-                bg=self.colors['frame_bg'], fg=self.colors['fg']).grid(row=1, column=0, sticky='w', padx=5, pady=2)
+                bg=self.colors['frame_bg'], fg=self.colors['fg']).grid(row=1, column=0, sticky='w', padx=5, pady=0)
         timeout_scale_multi = tk.Scale(settings_grid, from_=5, to=30, orient='horizontal', 
                                      variable=self.request_timeout,
                                      bg=self.colors['frame_bg'], fg=self.colors['fg'], 
                                      highlightbackground=self.colors['frame_bg'], length=150)
-        timeout_scale_multi.grid(row=1, column=1, sticky='ew', padx=5, pady=2)
+        timeout_scale_multi.grid(row=1, column=1, sticky='ew', padx=5, pady=0)
         
         # Threads
         tk.Label(settings_grid, text="Threads:", 
-                bg=self.colors['frame_bg'], fg=self.colors['fg']).grid(row=2, column=0, sticky='w', padx=5, pady=2)
+                bg=self.colors['frame_bg'], fg=self.colors['fg']).grid(row=2, column=0, sticky='w', padx=5, pady=0)
         thread_scale_multi = tk.Scale(settings_grid, from_=1, to=10, orient='horizontal', 
                                     variable=self.threads,
                                     bg=self.colors['frame_bg'], fg=self.colors['fg'], 
                                     highlightbackground=self.colors['frame_bg'], length=150)
-        thread_scale_multi.grid(row=2, column=1, sticky='ew', padx=5, pady=2)
+        thread_scale_multi.grid(row=2, column=1, sticky='ew', padx=5, pady=0)
         
         # Configure grid weights
         settings_grid.grid_columnconfigure(1, weight=1)
+        
+        # Injection Types for Multi-Scan
+        multi_injection_frame = tk.LabelFrame(left_side, text="💉 Injection Types", 
+                                             bg=self.colors['frame_bg'], fg=self.colors['fg'],
+                                             font=('Arial', 10, 'bold'))
+        multi_injection_frame.pack(fill='x', pady=(5, 0))
+        
+        injection_items = [
+            ('basic', 'Basic'), ('union', 'Union'), ('boolean', 'Boolean'), 
+            ('time_based', 'Time'), ('error_based', 'Error'),
+            ('advanced', 'Advanced'), ('bypass', 'Bypass'), ('json', 'JSON'),
+            ('nosql', 'NoSQL'), ('stacked', 'Stacked'),
+            ('auth_bypass', 'Auth Bypass'), ('filter_evasion', 'Filter Evasion'),
+            ('second_order', '2nd-Order')
+        ]
+        
+        multi_inj_grid = tk.Frame(multi_injection_frame, bg=self.colors['frame_bg'])
+        multi_inj_grid.pack(fill='x', padx=5, pady=(5, 5))
+        
+        for i, (key, label) in enumerate(injection_items):
+            row, col = i // 3, i % 3
+            tk.Checkbutton(multi_inj_grid, text=label, variable=self.injection_types[key],
+                          bg=self.colors['frame_bg'], fg=self.colors['fg'],
+                          selectcolor=self.colors['entry_bg'],
+                          font=('Arial', 8)).grid(row=row, column=col, sticky='w', padx=2, pady=1)
+        
+        # Quick select buttons + Tamper in one row below checkboxes
+        multi_controls_row = tk.Frame(multi_injection_frame, bg=self.colors['frame_bg'])
+        multi_controls_row.pack(fill='x', padx=5, pady=(3, 8))
+        tk.Button(multi_controls_row, text="Select All", command=self.select_all_injections,
+                 bg=self.colors['success'], fg=self.colors['button_fg'],
+                 font=('Arial', 8)).pack(side='left', padx=2)
+        tk.Button(multi_controls_row, text="Select None", command=self.select_no_injections,
+                 bg=self.colors['warning'], fg=self.colors['button_fg'],
+                 font=('Arial', 8)).pack(side='left', padx=2)
+        tk.Button(multi_controls_row, text="Recommended", command=self.select_recommended_injections,
+                 bg=self.colors['accent'], fg=self.colors['button_fg'],
+                 font=('Arial', 8)).pack(side='left', padx=2)
+        
+        # Tamper row
+        multi_tamper_row = tk.Frame(multi_injection_frame, bg=self.colors['frame_bg'])
+        multi_tamper_row.pack(fill='x', padx=5, pady=(0, 8))
+        tk.Label(multi_tamper_row, text="Tamper:", bg=self.colors['frame_bg'],
+                fg=self.colors['fg'], font=('Arial', 9)).pack(side='left', padx=(0, 5))
+        ttk.Combobox(multi_tamper_row, textvariable=self.tamper_script,
+                    values=list(self.tamper_scripts_map.keys()), state='readonly',
+                    width=16).pack(side='left', padx=3, fill='x', expand=True)
+        
+        # Session & Proxy for Multi-Scan
+        multi_net_frame = tk.LabelFrame(left_side, text="🔑 Session / 🌐 Proxy",
+                                       bg=self.colors['frame_bg'], fg=self.colors['fg'],
+                                       font=('Arial', 9, 'bold'))
+        multi_net_frame.pack(fill='x', pady=(5, 0))
+        
+        net_row1 = tk.Frame(multi_net_frame, bg=self.colors['frame_bg'])
+        net_row1.pack(fill='x', padx=5, pady=2)
+        tk.Checkbutton(net_row1, text="Session", variable=self.use_session,
+                      bg=self.colors['frame_bg'], fg=self.colors['fg'],
+                      selectcolor=self.colors['entry_bg'],
+                      font=('Arial', 8)).pack(side='left')
+        tk.Entry(net_row1, textvariable=self.session_cookies,
+                bg=self.colors['entry_bg'], fg=self.colors['entry_fg'],
+                font=('Consolas', 7)).pack(side='left', fill='x', expand=True, padx=3)
+        
+        net_row2 = tk.Frame(multi_net_frame, bg=self.colors['frame_bg'])
+        net_row2.pack(fill='x', padx=5, pady=(0, 2))
+        tk.Checkbutton(net_row2, text="Proxy", variable=self.use_proxy,
+                      bg=self.colors['frame_bg'], fg=self.colors['fg'],
+                      selectcolor=self.colors['entry_bg'],
+                      font=('Arial', 8)).pack(side='left')
+        tk.Entry(net_row2, textvariable=self.proxy_url,
+                bg=self.colors['entry_bg'], fg=self.colors['entry_fg'],
+                font=('Consolas', 7)).pack(side='left', fill='x', expand=True, padx=3)
+        
+        net_row3 = tk.Frame(multi_net_frame, bg=self.colors['frame_bg'])
+        net_row3.pack(fill='x', padx=5, pady=(0, 5))
+        tk.Button(net_row3, text="📁 Load Proxy List", command=self.load_proxy_file,
+                 bg=self.colors['accent'], fg=self.colors['button_fg'],
+                 font=('Arial', 8)).pack(side='left', padx=(0, 5))
+        ttk.Combobox(net_row3, textvariable=self.proxy_rotation,
+                    values=['round_robin', 'random', 'sticky'], state='readonly',
+                    width=12).pack(side='left', padx=3)
         
         # Right side - Statistics, Progress, and Results
         right_side = tk.Frame(content_frame, bg=self.colors['bg'])
@@ -776,7 +932,12 @@ http://demo.site/user.php?user_id=456
             "❌ Error-based",
             "🚀 Advanced",
             "🛡️ WAF Bypass",
-            "📋 JSON Payloads"
+            "📋 JSON Payloads",
+            "🍃 NoSQL",
+            "📚 Stacked Queries",
+            "🔑 Auth Bypass",
+            "🎭 Filter Evasion",
+            "🔄 Second-Order"
         ]
         
         for category in payload_categories:
@@ -872,7 +1033,7 @@ http://demo.site/user.php?user_id=456
                 bg=self.colors['bg'], fg=self.colors['accent'], 
                 font=('Arial', 18, 'bold')).pack()
         
-        tk.Label(header_frame, text="Version 2025.1 - Educational Edition",
+        tk.Label(header_frame, text="Version 2026.0 - Educational Edition",
                 bg=self.colors['bg'], fg=self.colors['fg'], 
                 font=('Arial', 12)).pack(pady=(5, 0))
         
@@ -892,14 +1053,59 @@ http://demo.site/user.php?user_id=456
 
 Developer: ShinX
 GitHub: https://github.com/VanessaEvo
-Version: 2025.1
-Release Date: July 2025
+Version: 2026.0
+Release Date: April 2026
 License: Educational Use Only
+
+🆕 WHAT'S NEW IN 2026.0
+═══════════════════════════════════════════════════════════════════════════════
+
+This is a major upgrade from 2025.x with significant architecture improvements:
+
+  ✦ YAML Configuration System (config.yaml)
+    - Centralized settings for scanning, detection, proxy, and logging
+    - No more hardcoded values — everything is configurable
+
+  ✦ Structured Logging
+    - All print() statements migrated to Python logging framework
+    - File + console output with configurable log levels
+    - Timestamped log file (sqltester.log)
+
+  ✦ Expanded Payload Library (900+ payloads)
+    - 4 new categories: Stacked, Auth Bypass, Filter Evasion, Second-Order
+    - Expanded NoSQL payloads for MongoDB
+
+  ✦ 22 Tamper Scripts (was 11)
+    - New: null_byte, hpp, json_encode, base64_encode, char_encode, 
+      concat_encode, between_encode, like_encode, scientific_notation,
+      chunked_transfer, encoding_chain
+
+  ✦ Enhanced Detection Engine
+    - Baseline-aware error correlation (reduces false positives)
+    - Second-Order SQL injection detection
+    - NoSQL injection detection (MongoDB, CouchDB)
+    - Support for stacked, auth_bypass, filter_evasion injection types
+
+  ✦ Session Management (session.py)
+    - CSRF token extraction (12 pattern types)
+    - Cookie persistence and management
+    - Authenticated scanning with login support
+
+  ✦ Proxy Support (proxy.py)
+    - HTTP / HTTPS / SOCKS5 proxy support
+    - Proxy rotation (round-robin, random, sticky)
+    - Health checking and failure tracking
+
+  ✦ Bug Fix: WAF Detection Patterns
+    - Fixed critical dead-code bug where WAF patterns were unreachable
 
 🌟 TOOL OVERVIEW
 ═══════════════════════════════════════════════════════════════════════════════
 
-This SQL Injection Testing Tool is designed for educational purposes and authorized security testing. It provides a comprehensive platform for learning about SQL injection vulnerabilities and testing web applications with proper authorization.
+This SQL Injection Testing Tool is designed for educational purposes and 
+authorized security testing. It provides a comprehensive platform for learning 
+about SQL injection vulnerabilities and testing web applications with proper 
+authorization.
 
 🔧 KEY FEATURES
 ═══════════════════════════════════════════════════════════════════════════════
@@ -907,8 +1113,10 @@ This SQL Injection Testing Tool is designed for educational purposes and authori
 • Advanced Detection Engine
   - Error-based SQL injection detection
   - Boolean-based blind SQL injection
-  - Time-based blind SQL injection
+  - Time-based blind SQL injection (with re-verification)
   - Union-based SQL injection
+  - Second-Order SQL injection detection
+  - NoSQL injection detection (MongoDB, CouchDB)
   - WAF bypass techniques
   - JSON-based injection testing
 
@@ -920,18 +1128,34 @@ This SQL Injection Testing Tool is designed for educational purposes and authori
   - Responsive layout design
 
 • Payload Management System
-  - 500+ pre-built payloads
+  - 900+ pre-built payloads across 13 categories
   - Database-specific payload optimization
   - Custom payload creation and editing
   - Payload categorization and organization
   - Import/export functionality
 
-• Advanced Features
-  - 200+ modern user agents for stealth testing
-  - Intelligent request throttling
-  - Session management
-  - Comprehensive reporting (HTML, CSV, JSON)
-  - Multi-target scanning capabilities
+• 22 Tamper Scripts for WAF Evasion
+  - Space-to-comment, random case, inline comments
+  - URL encoding, hex encoding, unicode escape
+  - Null byte, HPP, base64, JSON encoding
+  - Scientific notation, chunked transfer
+  - Encoding chain (combines multiple techniques)
+
+• Network Layer
+  - Session management with CSRF support
+  - Proxy routing (HTTP/SOCKS5)
+  - Cookie persistence for authenticated scanning
+  - 200+ modern user agents for stealth
+
+• Configuration & Logging
+  - YAML-based configuration (config.yaml)
+  - Structured logging to file and console
+  - Configurable scan parameters
+
+• Reporting
+  - HTML, CSV, and JSON export formats
+  - Professional styling and risk classification
+  - Remediation recommendations
 
 🔬 TECHNICAL SPECIFICATIONS
 ═══════════════════════════════════════════════════════════════════════════════
@@ -940,19 +1164,26 @@ Programming Language: Python 3.7+
 GUI Framework: Tkinter with custom dark theme styling
 HTTP Library: Requests with advanced session management
 Threading: Multi-threaded architecture for performance
-Supported Databases: MySQL, PostgreSQL, Microsoft SQL Server, Oracle, SQLite, MongoDB
+Configuration: YAML-based (config.yaml)
+Logging: Python logging framework with file output
+
+Supported Databases: 
+  MySQL, PostgreSQL, Microsoft SQL Server, Oracle, SQLite, MongoDB, CouchDB
 
 Detection Methods:
-• Pattern-based error detection
-• Response time analysis
+• Error-based pattern detection (150+ signatures)
+• Response time statistical analysis
 • Content-based boolean detection
 • Union query validation
 • Database fingerprinting
+• Second-order injection analysis
+• NoSQL operator injection detection
 
 ⚠️ LEGAL DISCLAIMER & ETHICAL USE
 ═══════════════════════════════════════════════════════════════════════════════
 
-🚨 IMPORTANT: This tool is designed exclusively for educational purposes and authorized security testing. Users must comply with all applicable laws and regulations.
+🚨 IMPORTANT: This tool is designed exclusively for educational purposes and 
+authorized security testing. Users must comply with all applicable laws.
 
 AUTHORIZED USE ONLY:
 • Only test systems you own or have explicit written permission to test
@@ -968,39 +1199,14 @@ PROHIBITED ACTIVITIES:
 • Using this tool for illegal or unethical purposes
 • Bypassing security measures without permission
 
-🎓 EDUCATIONAL VALUE
-═══════════════════════════════════════════════════════════════════════════════
-
-This tool serves as an educational platform for:
-• Understanding SQL injection vulnerabilities
-• Learning secure coding practices
-• Practicing ethical hacking techniques
-• Developing security testing skills
-• Preparing for security certifications
-
-Learning Objectives:
-• Identify common SQL injection patterns
-• Understand different injection techniques
-• Learn about database security
-• Practice responsible vulnerability disclosure
-• Develop defensive programming skills
-
-🙏 ACKNOWLEDGMENTS
-═══════════════════════════════════════════════════════════════════════════════
-
-Special thanks to the security research community for their contributions to SQL injection research and the development of detection techniques. This tool builds upon years of security research and responsible disclosure practices.
-
-Inspired by tools like SQLMap, Burp Suite, and other professional security testing platforms, while maintaining a focus on education and ethical use.
-
 📞 SUPPORT & FEEDBACK
 ═══════════════════════════════════════════════════════════════════════════════
 
 For questions, feedback, or educational inquiries:
 • GitHub: https://github.com/VanessaEvo
 • Issues: Report bugs and feature requests through GitHub Issues
-• Educational Use: This tool is provided as-is for educational purposes
 
-Remember: Always use this tool responsibly and ethically. The goal is to improve security through education and authorized testing, not to cause harm or engage in illegal activities.
+Remember: Always use this tool responsibly and ethically.
 
 ═══════════════════════════════════════════════════════════════════════════════
 """
@@ -1174,7 +1380,12 @@ Additional Information:
             4: 'error_based',
             5: 'advanced',
             6: 'bypass',
-            7: 'json'
+            7: 'json',
+            8: 'nosql',
+            9: 'stacked',
+            10: 'auth_bypass',
+            11: 'filter_evasion',
+            12: 'second_order'
         }
         
         category = category_map.get(category_index, 'basic')
@@ -1350,6 +1561,35 @@ Complexity: {'High' if len(payloads) > 50 else 'Medium' if len(payloads) > 20 el
             except Exception as e:
                 messagebox.showerror("Error", f"Failed to load file: {str(e)}")
     
+    def load_proxy_file(self):
+        """Load proxy list from a file (one proxy per line)"""
+        file_path = filedialog.askopenfilename(
+            title="Select proxy list file",
+            filetypes=[("Text files", "*.txt"), ("All files", "*.*")]
+        )
+        
+        if file_path:
+            try:
+                self.proxy_manager.clear()
+                count = self.proxy_manager.load_from_file(file_path)
+                if count > 0:
+                    self.use_proxy.set(True)
+                    self.proxy_manager.enabled = True
+                    # Update label if it exists (single target tab)
+                    if hasattr(self, 'proxy_count_label'):
+                        self.proxy_count_label.config(text=f"✅ {count} proxies loaded")
+                    messagebox.showinfo("Success", 
+                        f"Loaded {count} proxies from file.\n"
+                        f"Rotation mode: {self.proxy_rotation.get()}\n\n"
+                        f"Format supported:\n"
+                        f"  http://host:port\n"
+                        f"  socks5://host:port\n"
+                        f"  http://user:pass@host:port")
+                else:
+                    messagebox.showwarning("Warning", "No valid proxies found in file.")
+            except Exception as e:
+                messagebox.showerror("Error", f"Failed to load proxy file: {str(e)}")
+    
     def save_domains_file(self):
         """Save domains to a file"""
         file_path = filedialog.asksaveasfilename(
@@ -1430,10 +1670,12 @@ Complexity: {'High' if len(payloads) > 50 else 'Medium' if len(payloads) > 20 el
             return
         
         # Check if any injection types are selected
-        selected_types = [key for key, var in self.injection_types.items() if var.get() and key != 'nosql']
+        selected_types = [key for key, var in self.injection_types.items() if var.get()]
         if not selected_types:
             messagebox.showerror("Error", "Please select at least one injection type")
             return
+        # --- Apply Session & Proxy settings ---
+        self._apply_session_proxy()
 
         # --- Proactive WAF Detection ---
         self.log_result("INFO: Performing proactive WAF detection...")
@@ -1480,6 +1722,9 @@ Complexity: {'High' if len(payloads) > 50 else 'Medium' if len(payloads) > 20 el
         self.multi_results_text.delete('1.0', tk.END)
         self.root.update_idletasks()
         
+        # --- Apply Session & Proxy settings ---
+        self._apply_session_proxy()
+
         # Start multi-scan
         self.scan_running = True
         self.update_multi_scan_buttons()
@@ -1727,6 +1972,30 @@ Complexity: {'High' if len(payloads) > 50 else 'Medium' if len(payloads) > 20 el
             self.scan_running = False
             self.update_multi_scan_buttons()
     
+    def _apply_session_proxy(self):
+        """Apply current GUI session/proxy settings to managers."""
+        # Session
+        if self.use_session.get():
+            cookie_str = self.session_cookies.get().strip()
+            if cookie_str:
+                self.session_manager.set_cookie_string(cookie_str)
+            auth_token = self.session_auth_token.get().strip()
+            if auth_token:
+                self.session_manager.set_authorization(
+                    self.session_auth_type.get(), auth_token
+                )
+        # Proxy
+        if self.use_proxy.get():
+            proxy_url = self.proxy_url.get().strip()
+            if proxy_url:
+                # Single proxy — only set if no proxies loaded from file yet
+                if not self.proxy_manager.proxies:
+                    self.proxy_manager.set_single_proxy(proxy_url)
+                else:
+                    # Add single proxy to list if not already present
+                    self.proxy_manager.add_proxy(proxy_url)
+            self.proxy_manager.set_rotation_mode(self.proxy_rotation.get())
+
     def test_payload(self, url, param, payload, injection_type):
         """Test a single payload"""
         try:
@@ -1742,8 +2011,6 @@ Complexity: {'High' if len(payloads) > 50 else 'Medium' if len(payloads) > 20 el
             parsed = urllib.parse.urlparse(url)
             params = urllib.parse.parse_qs(parsed.query)
             
-            # This logic assumes the parameter value doesn't already contain the payload
-            # A more robust implementation would handle replacing existing payloads
             if param in params:
                 params[param] = [params[param][0] + payload]
             else:
@@ -1758,19 +2025,42 @@ Complexity: {'High' if len(payloads) > 50 else 'Medium' if len(payloads) > 20 el
             # Get random user agent
             headers = self.user_agent_manager.get_realistic_headers()
             
+            # --- Session integration ---
+            if self.use_session.get():
+                # Merge session headers with user-agent headers
+                for k, v in self.session_manager.session.headers.items():
+                    headers[k] = v
+                # Use session cookies
+                cookies = self.session_manager.get_cookies()
+            else:
+                cookies = None
+            
+            # --- Proxy integration ---
+            proxies = None
+            current_proxy = None
+            if self.use_proxy.get() and self.proxy_manager.enabled:
+                current_proxy = self.proxy_manager.get_proxy()
+                proxies = current_proxy
+            
             # Make request
             start_time = time.time()
-            response = requests.get(test_url, headers=headers, 
-                                  timeout=self.request_timeout.get())
+            response = requests.get(test_url, headers=headers,
+                                  timeout=self.request_timeout.get(),
+                                  cookies=cookies,
+                                  proxies=proxies)
             response_time = time.time() - start_time
+            
+            # Report proxy success
+            if current_proxy:
+                self.proxy_manager.report_success(current_proxy)
             
             # --- Pass Request Context for Re-verification ---
             request_context = {
-                'url': url, # Pass the original URL without payload
+                'url': url,
                 'param': param,
                 'headers': headers,
                 'timeout': self.request_timeout.get(),
-                'tamper_function': tamper_function # Pass for re-verification tampering
+                'tamper_function': tamper_function
             }
 
             # Analyze response
@@ -1781,6 +2071,10 @@ Complexity: {'High' if len(payloads) > 50 else 'Medium' if len(payloads) > 20 el
             return result
             
         except Exception as e:
+            # Report proxy failure if applicable
+            if self.use_proxy.get() and self.proxy_manager.enabled:
+                current_proxy = self.proxy_manager.get_proxy()
+                self.proxy_manager.report_failure(current_proxy)
             self.log_result(f"❌ Request failed for payload '{payload[:50]}...': {str(e)}")
             return None
     
@@ -1935,11 +2229,13 @@ Do you agree to these terms?
 
 def main():
     """Main function to run the application"""
+    import logging
+    _logger = logging.getLogger("sqltester.app")
     try:
         app = SQLInjectionTool()
         app.run()
     except Exception as e:
-        print(f"Error starting application: {e}")
+        _logger.error(f"Error starting application: {e}")
         messagebox.showerror("Error", f"Failed to start application: {e}")
 
 if __name__ == "__main__":
