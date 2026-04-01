@@ -1,8 +1,11 @@
 import json
 import csv
 import html
+import logging
 from datetime import datetime
 from typing import List, Dict, Any
+
+logger = logging.getLogger("sqltester.report")
 
 class ReportGenerator:
     """Generate comprehensive reports for SQL injection scan results"""
@@ -281,5 +284,5 @@ class ReportGenerator:
             return True
 
         except Exception as e:
-            print(f"Error saving report to {filename}: {e}")
+            logger.error(f"Error saving report to {filename}: {e}")
             raise e
