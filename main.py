@@ -24,7 +24,11 @@ def check_dependencies():
     required_packages = {
         'requests': 'requests',
         'urllib3': 'urllib3',
-        'tkinter': 'tkinter'
+        'tkinter': 'tkinter',
+        'pyyaml': 'yaml',
+        'tenacity': 'tenacity',
+        'colorama': 'colorama',
+        'rich': 'rich'
     }
 
     missing_packages = []
@@ -60,7 +64,10 @@ def check_files():
         'report.py',
         'domain.py',
         'engine.py',
-        'user_agent.py'
+        'user_agent.py',
+        'config.py',
+        'session.py',
+        'proxy.py'
     ]
 
     available_tools = []
@@ -86,7 +93,7 @@ def check_files():
 def show_banner():
     """Display welcome banner"""
     banner = """
-    🛡️ SQL INJECTION TESTING TOOL
+    🛡️ SQL INJECTION TESTING TOOL v2026.0
     ═══════════════════════════════════════════════
 
     Educational Use Only
@@ -99,9 +106,14 @@ def show_banner():
     • Sleek dark theme with professional styling
     • Single domain and multiple domain support
     • Real-time statistics and progress tracking
-    • Advanced payload management (500+ payloads)
-    • Professional reporting capabilities
-    • Syntax highlighting and visual feedback
+    • Advanced payload management (900+ payloads)
+    • 22 tamper scripts for WAF evasion
+    • Enhanced detection engine (Error, Boolean, Time,
+      Union, Second-Order, NoSQL)
+    • Session & proxy management
+    • YAML-based configuration system
+    • Structured logging
+    • Professional reporting (HTML, CSV, JSON)
     • 200+ modern user agents for stealth
     • Database fingerprinting and detection
 
@@ -171,17 +183,14 @@ def launch_tool(tool_file):
 def install_dependencies():
     """Try to install dependencies automatically"""
     print("🔧 Attempting to install dependencies...")
-    required_packages = ['requests', 'urllib3']
-
     try:
-        for package in required_packages:
-            subprocess.check_call([sys.executable, '-m', 'pip', 'install', package])
+        subprocess.check_call([sys.executable, '-m', 'pip', 'install', '-r', 'requirements.txt'])
         print("✅ Dependencies installed successfully!")
         return True
     except Exception as e:
         print(f"❌ Failed to install dependencies: {e}")
         print("   Please install them manually:")
-        print(f"   pip install {' '.join(required_packages)}")
+        print("   pip install -r requirements.txt")
         return False
 
 def main():
