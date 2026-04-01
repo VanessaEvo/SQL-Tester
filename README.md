@@ -1,8 +1,8 @@
 # SQL Injection Testing Tool
 
-## 🌟 Version 2025.2 Enhanced Edition
+## 🌟 Version 2026.0
 
-**A powerful, accurate, and educational SQL injection testing platform with cutting-edge 2025 detection techniques.**
+**A powerful, accurate, and educational SQL injection testing platform with cutting-edge detection techniques.**
 
 ![Python Version](https://img.shields.io/badge/python-3.7+-blue.svg)
 ![License](https://img.shields.io/badge/license-Educational%20Use%20Only-red.svg)
@@ -14,7 +14,7 @@
 ## 📋 Table of Contents
 
 - [Overview](#-overview)
-- [What's New in 2025.2](#-whats-new-in-20252)
+- [What's New in 2026.0](#-whats-new-in-20260)
 - [Key Features](#-key-features)
 - [Installation](#️-installation)
 - [Quick Start Guide](#-quick-start-guide)
@@ -23,6 +23,7 @@
 - [Detection Methods](#-detection-methods)
 - [Payload Tampering](#-payload-tampering)
 - [Reporting](#-reporting)
+- [Architecture](#-architecture)
 - [Technical Specifications](#-technical-specifications)
 - [Ethical and Legal Disclaimer](#️-ethical-and-legal-disclaimer)
 - [FAQ](#-faq)
@@ -34,35 +35,74 @@
 
 This SQL Injection Testing Tool is a **comprehensive, educational platform** designed for authorized security testing and learning about SQL injection vulnerabilities. Built with Python and featuring a modern Tkinter GUI, it combines powerful detection capabilities with an intuitive user interface.
 
-- ✅ **92% Detection Accuracy** - Industry-leading detection with minimal false positives (<5%)
-- ✅ **500+ Payloads** - Comprehensive payload library covering all major databases
-- ✅ **11 Tampering Methods** - Advanced WAF bypass techniques
-- ✅ **Real-time Feedback** - Live statistics, progress tracking, and detailed logging
-- ✅ **Professional Reports** - Export results in HTML, CSV, or JSON formats
-- ✅ **Educational Focus** - Learn SQL injection techniques safely and responsibly
+- ✅ **92% Detection Accuracy** — Industry-leading detection with minimal false positives (<5%)
+- ✅ **900+ Payloads** — Comprehensive payload library across 13 categories
+- ✅ **22 Tampering Methods** — Advanced WAF bypass techniques
+- ✅ **7 Detection Types** — Error, Boolean, Time, Union, Second-Order, NoSQL, Advanced
+- ✅ **Session & Proxy** — Authenticated scanning with CSRF support and proxy rotation
+- ✅ **YAML Config** — Centralized, human-readable configuration
+- ✅ **Professional Reports** — Export results in HTML, CSV, or JSON formats
+- ✅ **Educational Focus** — Learn SQL injection techniques safely and responsibly
 
 ---
 
-## 🆕 What's New in 2025.2
+## 🆕 What's New in 2026.0
 
-### Major Improvements:
+### 🏗️ Architecture Overhaul
 
-#### ✨ **Enhanced Detection Accuracy**
-- **Automatic Baseline Establishment**: Now automatically establishes response baseline before testing (eliminates false positives)
-- **Payload-Error Correlation**: Verifies that detected errors are actually caused by injected payloads (reduces false positives by 80%)
-- **Improved Time-Based Detection**: 3-second minimum threshold + re-verification logic (95% accuracy)
-- **Better Boolean-Based Detection**: Handles dynamic content (ads, timestamps) correctly (85% accuracy)
+#### ✦ **Configuration System**
+- New `config.yaml` for centralized, human-readable settings
+- `config.py` singleton loader — all modules share one config
+- Covers scanning, detection, proxy, user-agent, and logging settings
 
-#### 🚀 **New Features**
-- **11 Advanced Tampering Methods**: Space-to-comment, random case, inline comments, double URL encode, hex encoding, unicode escape, and more
-- **25+ New 2025 Payloads**: Cloudflare bypasses, ModSecurity evasion, AWS WAF bypasses, modern extraction techniques
-- **Enhanced False Positive Filtering**: 45+ patterns to filter educational content, documentation, and code examples
+#### ✦ **Structured Logging**
+- All `print()` statements migrated to Python `logging` framework
+- File output (`sqltester.log`) + console output
+- Configurable log levels (DEBUG / INFO / WARNING / ERROR)
 
-#### 📊 **Performance Metrics**
-- Overall Detection Accuracy: **74% → 92%** (+18%)
-- False Positive Rate: **30% → <5%** (-25%)
-- Time-Based Accuracy: **70% → 95%** (+25%)
-- Boolean-Based Accuracy: **60% → 85%** (+25%)
+#### ✦ **Network Layer**
+- `session.py` — CSRF token extraction (12 patterns), cookie persistence, authenticated scanning
+- `proxy.py` — HTTP/HTTPS/SOCKS5 support, 3 rotation modes, health checking
+
+### 💉 Expanded Payloads (500+ → 900+)
+
+| Category | New? | Count |
+|----------|------|-------|
+| Basic | | 25+ |
+| Union-Based | | 80+ |
+| Boolean-Based | | 40+ |
+| Time-Based | | 60+ |
+| Error-Based | | 50+ |
+| Advanced | | 40+ |
+| WAF Bypass | | 100+ |
+| JSON/NoSQL | ✦ Expanded | 80+ |
+| **Stacked** | ✦ New | 60+ |
+| **Auth Bypass** | ✦ New | 70+ |
+| **Filter Evasion** | ✦ New | 80+ |
+| **Second-Order** | ✦ New | 50+ |
+
+### 🔧 22 Tamper Scripts (was 11)
+
+New scripts in 2026.0:
+- `null_byte` — Null byte injection for string termination
+- `hpp` — HTTP Parameter Pollution
+- `json_encode` — JSON-wrapped payloads
+- `base64_encode` — Base64 encoded payloads
+- `char_encode` — CHAR() function encoding
+- `concat_encode` — CONCAT() fragmentation
+- `between_encode` — BETWEEN operator substitution
+- `like_encode` — LIKE operator substitution
+- `scientific_notation` — Scientific notation for numbers
+- `chunked_transfer` — Chunked transfer encoding markers
+- `encoding_chain` — Combines multiple encoding techniques
+
+### 🔍 Enhanced Detection Engine
+
+- **Baseline-aware error correlation** — errors already present in baseline are down-weighted, new errors boosted
+- **Second-Order SQLi detection** — detects stored payloads that trigger on retrieval
+- **NoSQL injection detection** — MongoDB (10 patterns), CouchDB (3 patterns), data leakage detection
+- **Extended heuristic analysis** — covers `stacked`, `auth_bypass`, `filter_evasion` types
+- **Bug fix** — WAF detection patterns were unreachable dead code (now fixed)
 
 ---
 
@@ -70,15 +110,16 @@ This SQL Injection Testing Tool is a **comprehensive, educational platform** des
 
 ### 🔍 Advanced Detection Engine
 
-#### **5 Detection Methods:**
+#### **7 Detection Methods:**
+
 1. **Error-Based Detection** (95% accuracy)
-   - Detects SQL errors in responses
-   - Supports MySQL, PostgreSQL, MSSQL, Oracle, SQLite
-   - Correlation verification to eliminate false positives
+   - 150+ error signatures across MySQL, PostgreSQL, MSSQL, Oracle, SQLite
+   - Payload-error correlation verification
+   - Context-aware confidence scoring
 
 2. **Boolean-Based Blind SQLi** (85% accuracy)
-   - Compares response differences
-   - Handles dynamic content intelligently
+   - Multi-metric response comparison (length, structure, content, hash)
+   - Dynamic content handling (ads, timestamps)
    - Multiple evidence requirements
 
 3. **Time-Based Blind SQLi** (95% accuracy)
@@ -87,142 +128,65 @@ This SQL Injection Testing Tool is a **comprehensive, educational platform** des
    - Network latency compensation
 
 4. **Union-Based SQLi** (85% accuracy)
-   - Detects UNION SELECT errors
-   - Column enumeration support
-   - Successful extraction detection
+   - Column enumeration error detection
+   - Successful data extraction detection
+   - Information schema access detection
 
-5. **Advanced/WAF Bypass** (Variable accuracy)
-   - 11 tampering methods available
+5. **Second-Order SQLi** (New in 2026.0)
+   - Storage confirmation detection
+   - SQL metacharacter survival checking
+   - Error-on-retrieval analysis
+   - Requires ≥2 indicators for confidence
+
+6. **NoSQL Injection** (New in 2026.0)
+   - MongoDB error patterns (10 signatures)
+   - CouchDB error patterns
+   - Data leakage detection (ObjectId, password, admin)
+   - Boolean-style response diffing for operator injection
+
+7. **Advanced/WAF Bypass** (Variable accuracy)
+   - 22 tampering methods available
    - Cloudflare, ModSecurity, AWS WAF bypasses
    - Custom obfuscation techniques
 
 ### 🎨 Professional User Interface
 
-- **Modern Dark Theme**: Easy on the eyes for extended testing sessions
-- **Real-Time Statistics**: Live request count, vulnerabilities found, scan status
-- **Progress Tracking**: Visual progress bars with estimated completion
-- **Live Result Logs**: See every test in real-time with color-coded results
-- **Multi-Tab Interface**: Organized workflow with dedicated tabs for each function
+- **Modern Dark Theme** — Easy on the eyes for extended sessions
+- **Real-Time Statistics** — Live request count, vulnerabilities, scan status
+- **Progress Tracking** — Visual progress bars
+- **Live Result Logs** — Color-coded results in real-time
+- **Multi-Tab Interface** — Scanner, Multi-target, Results, Payloads, About
 
-### 🎯 Flexible Scanning Modes
+### 🌐 Network Layer (New in 2026.0)
 
-#### **Single Target Scan**
-- Deep, comprehensive testing of one URL
-- All 500+ payloads available
-- Full tamper script support
-- Detailed per-payload results
+#### **Session Management**
+- CSRF token extraction (12 HTML/JS patterns)
+- Cookie persistence across requests
+- Login authentication flow
+- Auto CSRF injection on POST requests
 
-#### **Multiple Target Scan**
-- Bulk scanning from file or text input
-- Domain validation before testing
-- Progress tracking per domain
-- Quick scan mode (top 5 payloads per type)
-
-#### **Quick vs Full Scan**
-- **Quick Scan**: 15 payloads per type (fast, efficient)
-- **Full Scan**: All 500+ payloads (thorough, comprehensive)
-
-### 🛡️ WAF Detection & Bypass
-
-- **Proactive WAF Detection**: Automatically detects WAF presence before scanning
-- **WAF Indicators**: Cloudflare, Akamai, Imperva, ModSecurity, AWS WAF, and more
-- **11 Tampering Methods**: Advanced obfuscation for bypass
-- **Smart Evasion**: Automatic suggestions based on detected WAF
-
-### 💉 Comprehensive Payload Library
-
-#### **500+ Payloads Across 8 Categories:**
-
-1. **Basic Payloads** (25+)
-   - Single/double quotes
-   - Comment injections
-   - OR-based bypasses
-
-2. **Union-Based** (80+)
-   - Database-specific UNION SELECT
-   - Column enumeration
-   - Information schema extraction
-   - Supports: MySQL, PostgreSQL, MSSQL, Oracle, SQLite
-
-3. **Boolean-Based** (40+)
-   - AND/OR conditions
-   - Substring extraction
-   - ASCII comparison
-   - Conditional queries
-
-4. **Time-Based** (60+)
-   - SLEEP() for MySQL
-   - pg_sleep() for PostgreSQL
-   - WAITFOR DELAY for MSSQL
-   - DBMS_PIPE for Oracle
-   - randomblob() for SQLite
-
-5. **Error-Based** (50+)
-   - EXTRACTVALUE exploitation
-   - UPDATEXML exploitation
-   - Type conversion errors
-   - Geometric function errors
-
-6. **Advanced** (40+)
-   - Database fingerprinting
-   - Version detection
-   - User enumeration
-   - System information
-
-7. **WAF Bypass** (100+)
-   - Cloudflare-specific (NEW 2025)
-   - ModSecurity evasion (NEW 2025)
-   - AWS WAF bypasses (NEW 2025)
-   - Inline comments
-   - URL encoding variations
-   - Case variations
-
-8. **JSON Payloads** (50+)
-   - NoSQL query injection
-   - MongoDB operators
-   - JSON-based SQLi
-   - GraphQL injection patterns
-
-### 🔧 Payload Management System
-
-- **Browse by Category**: Easy navigation through 8 payload categories
-- **Add Custom Payloads**: Create your own injection strings
-- **Edit/Delete**: Full CRUD operations on payloads
-- **Import/Export**: Save and share custom payload sets
-- **Test Payloads**: Quick testing before using in scans
-- **Statistics**: View payload counts and complexity metrics
+#### **Proxy Support**
+- HTTP / HTTPS / SOCKS5 proxies
+- 3 rotation modes: round-robin, random, sticky
+- Proxy health checking
+- Automatic failure tracking with max-retry
 
 ### 📊 Professional Reporting
 
-#### **3 Export Formats:**
-
-1. **HTML Reports**
-   - Professional styling with CSS
-   - Vulnerability summaries
-   - Risk classifications
-   - Remediation recommendations
-   - Detailed evidence sections
-
-2. **CSV Reports**
-   - Spreadsheet-ready format
-   - All vulnerability details
-   - Easy sorting and filtering
-   - Compatible with Excel, Google Sheets
-
-3. **JSON Reports**
-   - Machine-readable format
-   - Full scan metadata
-   - Perfect for automation
-   - API integration ready
+| Format | Use Case |
+|--------|----------|
+| **HTML** | Share with clients/management — styled with CSS |
+| **CSV** | Data analysis in Excel/Sheets |
+| **JSON** | Automation and API integration |
 
 ### 🔐 Security Features
 
-- **200+ Modern User Agents**: Realistic browser fingerprinting
-- **Request Throttling**: Configurable delays (0.1-5 seconds)
-- **Timeout Management**: Customizable timeouts (5-30 seconds)
-- **Thread Control**: 1-10 concurrent threads
-- **Pause/Resume**: Full scan control
-- **Stop Function**: Emergency scan termination
+- 200+ modern user agents for realistic fingerprinting
+- Configurable request delay (0.1-5 seconds)
+- Customizable timeouts (5-30 seconds)
+- Thread control (1-10 concurrent)
+- Pause / Resume / Stop scan controls
+- Proactive WAF detection before scanning
 
 ---
 
@@ -258,15 +222,21 @@ This SQL Injection Testing Tool is a **comprehensive, educational platform** des
    pip install -r requirements.txt
    ```
 
-4. **Verify Installation**
+4. **Launch**
    ```bash
-   python main.py --help
+   python main.py
    ```
 
 ### Dependencies
 
-- `requests>=2.31.0` - HTTP requests handling
-- `urllib3>=2.0.0` - URL parsing and encoding
+```
+requests>=2.31.0
+urllib3<3
+pyyaml>=6.0
+rich>=13.0
+tenacity>=8.0
+colorama>=0.4.6
+```
 
 ---
 
@@ -278,7 +248,7 @@ This SQL Injection Testing Tool is a **comprehensive, educational platform** des
 python main.py
 ```
 
-or
+or directly:
 
 ```bash
 python sqltool.py
@@ -286,15 +256,15 @@ python sqltool.py
 
 ### 5-Minute Tutorial
 
-1. **Accept Ethical Agreement**: Read and agree to responsible use
+1. **Accept Ethical Agreement** — Read and agree to responsible use
 2. **Go to Single Target Tab**
-3. **Enter a Test URL**: `http://testphp.vulnweb.com/artists.php?artist=1`
-4. **Click "Parse URL Parameters"**: Auto-detects `artist` parameter
-5. **Select Injection Types**: Check "Basic", "Union", "Error-based"
-6. **Choose Tamper Script**: Select "None" for testing
-7. **Click "START SCAN"**: Watch real-time results
-8. **View Results**: Check Results tab for vulnerabilities found
-9. **Export Report**: Click "Export HTML" to save findings
+3. **Enter a Test URL** — `http://testphp.vulnweb.com/artists.php?artist=1`
+4. **Click "Parse URL Parameters"** — Auto-detects `artist` parameter
+5. **Select Injection Types** — Check Basic, Union, Error-based
+6. **Choose Tamper Script** — Select "None" for testing
+7. **Click "START SCAN"** — Watch real-time results
+8. **View Results** — Check Results tab for vulnerabilities found
+9. **Export Report** — Click "Export HTML" to save findings
 
 ---
 
@@ -309,41 +279,36 @@ Parameter: id (auto-detected or manual)
 ```
 
 #### Step 2: Select Injection Types
-- ✅ **Basic**: Quick quote-based tests
-- ✅ **Union**: UNION SELECT enumeration
-- ✅ **Boolean**: AND/OR blind SQLi
-- ✅ **Time-Based**: SLEEP/DELAY blind SQLi
-- ✅ **Error-Based**: Error message analysis
-- ⬜ **Advanced**: Database fingerprinting
-- ⬜ **Bypass**: WAF evasion payloads
-- ⬜ **JSON**: NoSQL/JSON injection
-
-**Recommendation**: Start with Basic + Union + Error-based for quick assessment
+| Type | Default | Description |
+|------|---------|-------------|
+| Basic | ✅ | Quick quote-based tests |
+| Union | ✅ | UNION SELECT enumeration |
+| Boolean | ✅ | AND/OR blind SQLi |
+| Time-Based | ✅ | SLEEP/DELAY blind SQLi |
+| Error-Based | ✅ | Error message analysis |
+| Advanced | ⬜ | Database fingerprinting |
+| Bypass | ⬜ | WAF evasion payloads |
+| JSON | ⬜ | JSON injection |
+| NoSQL | ⬜ | MongoDB/CouchDB injection |
+| Stacked | ⬜ | Stacked queries |
+| Auth Bypass | ⬜ | Authentication bypass |
+| Filter Evasion | ⬜ | Input filter bypass |
+| Second-Order | ⬜ | Stored payload trigger |
 
 #### Step 3: Choose Scan Mode
 - **Quick Scan**: 15 payloads per type (~2-3 minutes)
-- **Full Scan**: All 500+ payloads (~10-15 minutes)
+- **Full Scan**: All 900+ payloads (~10-15 minutes)
 
 #### Step 4: Select Tamper Script
+
 | Scenario | Recommended Tamper Script |
 |----------|---------------------------|
-| No WAF detected | None or Space to Comment |
+| No WAF detected | None |
 | Cloudflare | Mixed Obfuscation |
 | ModSecurity | Inline Comments |
 | AWS WAF | Double URL Encode |
-| Generic WAF | Space to Comment + Random Case |
-| Maximum Evasion | Mixed Obfuscation |
-
-#### Step 5: Configure Settings
-- **Request Delay**: 1.0s (default) - Increase if rate-limited
-- **Timeout**: 10s (default) - Increase for slow sites
-- **Threads**: 1 (default) - Increase for faster scanning
-
-#### Step 6: Start Scan
-- Click **"START SCAN"**
-- Monitor live results in the log panel
-- Watch statistics update in real-time
-- Pause/Resume as needed
+| Generic WAF | Space to Comment |
+| Maximum Evasion | Encoding Chain |
 
 ### Multiple Target Scanning
 
@@ -355,71 +320,13 @@ http://site3.com/news.php?article=10
 ```
 
 #### Method 2: Load from File
-Create `targets.txt`:
-```
-# SQL Injection Test Targets
-http://site1.com/page.php?id=1
-http://site2.com/product.php?pid=5
-http://site3.com/news.php?article=10
-```
-Then click **"Load File"** button
+- Create `targets.txt` with one URL per line
+- Click **"Load File"** button
 
-#### Domain Validation
-- Click **"Validate Domains"** before scanning
-- Checks URL format, parameters, and connectivity
-- Shows ✅ valid and ❌ invalid domains
-- Only valid domains will be scanned
-
-### Results Analysis
-
-#### Results Tab Features
-
-1. **Summary Statistics**
-   - Total scans performed
-   - Total vulnerabilities found
-   - High-risk vulnerabilities
-   - Medium-risk vulnerabilities
-
-2. **Detailed Results Table**
-   | Column | Description |
-   |--------|-------------|
-   | Time | When vulnerability was found |
-   | Target | URL being tested |
-   | Parameter | Vulnerable parameter |
-   | Type | Injection technique |
-   | Status | Vulnerable / Not Vulnerable |
-   | Confidence | 50-99% confidence score |
-   | Risk | High / Medium / Low |
-
-3. **Double-Click for Details**
-   - Full payload used
-   - Complete error message
-   - Response analysis
-   - Remediation advice
-
-### Payload Management
-
-#### Browse Payloads
-1. Go to **Payloads Tab**
-2. Click category on left (Basic, Union, Boolean, etc.)
-3. View all payloads in that category
-4. See statistics (count, average length, complexity)
-
-#### Add Custom Payload
-1. Type payload in editor at bottom
-2. Click **"➕ Add Payload"**
-3. Payload added to current category
-
-#### Edit Payload
-1. Select payload from list
-2. Click **"✏️ Edit Selected"**
-3. Payload appears in editor
-4. Modify and click **"➕ Add Payload"** again
-
-#### Import/Export Payloads
-- **Save**: Export current category to .txt or .json file
-- **Load**: Import custom payloads from file
-- **Reset**: Restore default 500+ payloads
+#### Flow
+1. **Validate Domains** → Checks URL format, parameters, connectivity
+2. **Start Multi-Scan** → Tests all valid domains sequentially
+3. **Results** → Aggregated in Results tab
 
 ---
 
@@ -427,118 +334,80 @@ Then click **"Load File"** button
 
 ### WAF Detection System
 
-**How It Works:**
-1. Sends benign SQL injection probe before actual scan
-2. Checks for WAF signatures in response
-3. Detects status code changes (403, 429, 503)
-4. Identifies common WAF vendors
+**Automatically detects before scanning:**
+- Cloudflare, AWS WAF, ModSecurity, Akamai, Imperva, Sucuri, Wordfence, F5 BIG-IP
 
-**Detected WAFs:**
-- Cloudflare
-- AWS WAF
-- ModSecurity
-- Akamai
-- Imperva (Incapsula)
-- Sucuri
-- Wordfence
-- F5 BIG-IP
+**Detection methods:**
+1. Status code changes (403, 429, 503) on probe
+2. WAF keyword detection in response body
+3. Generic blocking page detection
 
-**What Happens When WAF Detected:**
-1. Warning dialog appears
-2. User can choose to continue or stop
-3. Recommendation to use bypass payloads
-4. Suggestion for appropriate tamper script
+### Session Management (New in 2026.0)
+
+**Use for authenticated scanning:**
+```yaml
+# config.yaml
+scanning:
+  mode: sync
+  timeout: 10
+```
+
+SessionManager supports:
+- Cookie injection from browser dev tools
+- Login flow with automatic CSRF extraction
+- Bearer / Basic / Token authorization headers
+
+### Proxy Configuration (New in 2026.0)
+
+#### Method 1: Single Proxy (via GUI)
+1. Go to **Single Target** → **🌐 Proxy** section
+2. Check **"Enable Proxy"**
+3. Enter proxy URL in the input field
+4. Select rotation mode (use `sticky` for single proxy)
+
+#### Method 2: Proxy List File (for rotation)
+1. Create a `.txt` file with one proxy per line
+2. Click **"📁 Load Proxy List"** button (available in both tabs)
+3. Proxy is auto-enabled after loading
+
+**Supported proxy formats** (in the `.txt` file or input field):
+```
+# All these formats are valid:
+192.168.1.1:8080              # Auto-detected as http://
+http://192.168.1.1:8080       # HTTP proxy
+https://192.168.1.1:8443      # HTTPS proxy
+socks5://192.168.1.1:1080     # SOCKS5 proxy
+socks5h://192.168.1.1:1080    # SOCKS5 with DNS through proxy
+http://user:pass@proxy:8080   # Proxy with authentication
+socks5://user:pass@proxy:1080 # SOCKS5 with authentication
+
+# Lines starting with # are treated as comments
+# Empty lines are ignored
+```
+
+> **Note:** If the scheme (`http://`, `socks5://`, etc.) is omitted, the tool will automatically treat it as `http://`.
+
+#### Rotation Modes
+
+| Mode | Behavior |
+|------|----------|
+| `round_robin` | Cycles through proxies in order (1 → 2 → 3 → 1 → ...) |
+| `random` | Picks a random proxy for each request |
+| `sticky` | Uses the same proxy for all requests (best for single proxy) |
+
+#### Proxy Health & Failure Tracking
+- Proxies are tracked for failures automatically
+- After **3 consecutive failures**, a proxy is temporarily disabled
+- When all proxies fail, failure counts reset and all are retried
+- Successful requests reset a proxy's failure count
 
 ### Baseline Response System
 
-**Automatic Feature (2025.2 New!)**
-
-Before testing any payloads, the tool now:
+Before testing payloads, the tool:
 1. Sends a clean request to establish baseline
-2. Captures: response time, content length, HTML structure
-3. Uses baseline for comparison in boolean-based and time-based detection
-4. Significantly improves accuracy
-
-**Baseline Metrics:**
-- Response time (for time-based detection threshold)
-- Response hash (for exact comparison)
-- Content length (for size comparison)
-- HTML patterns (forms, tables, divs count)
-
-### Tampering Engine
-
-**Purpose**: Obfuscate payloads to bypass WAF/IDS/IPS filters
-
-**Available Tampering Methods:**
-
-1. **Space to Comment** (`/**/`)
-   ```sql
-   SELECT FROM users  →  SELECT/**/FROM/**/users
-   ```
-
-2. **Random Case**
-   ```sql
-   SELECT  →  SeLeCt  →  sELecT
-   ```
-
-3. **Space to Random Whitespace**
-   ```sql
-   SELECT  →  SELECT\t  →  SELECT\n
-   ```
-
-4. **Inline Comments**
-   ```sql
-   SELECT  →  /*1234*/SELECT/*5678*/
-   ```
-
-5. **Double URL Encode**
-   ```sql
-   '  →  %27  →  %2527
-   ```
-
-6. **Hex Encode Strings**
-   ```sql
-   'admin'  →  0x61646d696e
-   ```
-
-7. **Space to Plus**
-   ```sql
-   SELECT FROM  →  SELECT+FROM
-   ```
-
-8. **Version Comment (MySQL)**
-   ```sql
-   SELECT  →  /*!50000SELECT*/
-   ```
-
-9. **Unicode Escape**
-   ```sql
-   SELECT  →  \u0053\u0045\u004c\u0045\u0043\u0054
-   ```
-
-10. **Space to Hash Comment**
-    ```sql
-    SELECT FROM  →  SELECT#\nFROM
-    ```
-
-11. **Mixed Obfuscation**
-    - Combines multiple techniques randomly
-    - Maximum evasion capability
-
-### Statistical Analysis (Time-Based)
-
-**Advanced Detection Logic:**
-1. Collects response times for baseline
-2. Calculates average and standard deviation
-3. Sets threshold: `MAX(3.0, avg + 3*stdev + 2)`
-4. Requires time function in payload (SLEEP, etc.)
-5. Re-verifies with doubled sleep duration
-6. Only reports if both tests confirm delay
-
-**Why This Matters:**
-- Eliminates false positives from network lag
-- Accounts for server response time variations
-- 95% accuracy in detecting time-based SQLi
+2. Captures: response time, content length, HTML structure, hash
+3. Uses baseline for comparison in all detection methods
+4. Errors that exist in baseline are down-weighted (Batch 3 enhancement)
 
 ---
 
@@ -546,207 +415,124 @@ Before testing any payloads, the tool now:
 
 ### 1. Error-Based Detection (95% Accuracy)
 
-**How It Works:**
-- Injects payloads designed to trigger SQL errors
-- Pattern matches against 155+ error signatures
-- Supports all major databases
-
-**What It Detects:**
-- SQL syntax errors
-- Database function errors
-- Type conversion errors
-- Permission errors
-- Connection errors
-
-**Example Payloads:**
-```sql
-'
-"
-';--
-' OR '1'='1
-1' AND EXTRACTVALUE(1,CONCAT(0x7e,VERSION()))--
-```
-
-**Confidence Scoring:**
-- High (>95%): Exact error pattern match + payload correlation
-- Medium (85-95%): Error pattern match, weak correlation
-- Low (70-85%): Generic error pattern
+- 150+ error signatures across 5 database families
+- Context-aware analysis (checks for error containers, debug info, stack traces)
+- Payload-error correlation verification
+- Baseline-aware: pre-existing errors don't inflate confidence
 
 ### 2. Boolean-Based Blind SQLi (85% Accuracy)
 
-**How It Works:**
-- Sends two payloads: one TRUE condition, one FALSE
-- Compares responses for differences
-- Analyzes similarity, structure, and length
-
-**What It Detects:**
-- Different content for TRUE vs FALSE
-- Structural changes (HTML elements)
-- Length differences
-
-**Example Payloads:**
-```sql
-' AND 1=1--   (TRUE - should return normal page)
-' AND 1=0--   (FALSE - should return different page)
-```
-
-**Confidence Scoring:**
-- Requires: <40% similarity OR >40% structural difference OR >30% length change
-- Max confidence: 75% (boolean-based has higher false positive risk)
+- 4-metric similarity scoring: length, hash, structure, content
+- Requires boolean payload indicators (AND, OR, =, etc.)
+- Max confidence capped at 75% (higher false positive risk)
+- Dynamic content filtering
 
 ### 3. Time-Based Blind SQLi (95% Accuracy)
 
-**How It Works:**
-- Injects SLEEP/DELAY payloads
-- Measures response time increase
-- Compares against baseline with statistical analysis
-- Re-verifies with doubled delay
-
-**What It Detects:**
-- Response time delays matching payload duration
-- Consistent timing across multiple tests
-
-**Example Payloads:**
-```sql
-MySQL:      ' AND SLEEP(5)--
-PostgreSQL: ' AND pg_sleep(5)--
-MSSQL:      ' WAITFOR DELAY '0:0:5'--
-Oracle:     ' AND DBMS_LOCK.SLEEP(5)--
-SQLite:     ' AND randomblob(50000000)--
-```
-
-**Confidence Scoring:**
-- 98%: Re-verification successful (doubled delay confirmed)
-- 75%: Initial detection only (no re-verification)
+- Statistical threshold: `MAX(3.0, avg + 3*stdev + 2)`
+- Requires time function in payload (SLEEP, pg_sleep, etc.)
+- Re-verification with doubled delay for 98% confidence
+- Network latency compensation
 
 ### 4. Union-Based SQLi (85% Accuracy)
 
-**How It Works:**
-- Tests with UNION SELECT payloads
-- Detects column count errors
-- Identifies successful data extraction
+- 8 union-specific error patterns
+- Column enumeration detection
+- Successful extraction indicators (information_schema, system tables)
 
-**What It Detects:**
-- "Different number of columns" errors
-- Successful UNION result display
-- Information schema access
+### 5. Second-Order SQLi (New — 85% max confidence)
 
-**Example Payloads:**
-```sql
-' UNION SELECT NULL--
-' UNION SELECT NULL,NULL--
-' UNION SELECT NULL,NULL,NULL--
-' UNION SELECT version(),user(),database()--
-```
+Multi-indicator analysis:
+- Payload reflected in response (stored)
+- Storage confirmation patterns detected
+- SQL metacharacters survived (not sanitized)
+- SQL error triggered on retrieval
 
-**Confidence Scoring:**
-- High (90-95%): Column count error
-- Medium (85%): Successful UNION result display
+### 6. NoSQL Injection (New — 95% max confidence)
 
-### 5. Advanced/WAF Bypass (Variable)
+- 10 MongoDB error patterns (MongoError, $where, Cast failed, etc.)
+- 3 CouchDB error patterns
+- 5 data leakage patterns (_id, ObjectId, password, admin role)
+- Boolean-style response diffing for NoSQL operators
 
-**How It Works:**
-- Uses obfuscated payloads
-- Applies tampering techniques
-- Tests WAF-specific bypasses
+### 7. Advanced/WAF Bypass (Variable)
 
-**What It Detects:**
-- WAF-protected vulnerabilities
-- Filtered but vulnerable parameters
-
-**Example Bypasses:**
-```sql
-Cloudflare:    ' AND'x'='x
-ModSecurity:   ' /*!12345UNION*/ /*!12345SELECT*/
-AWS WAF:       ' UNION/**_**/SELECT/**_**/NULL--
-```
+- Uses obfuscated payloads with tamper scripts
+- Subtle indicator detection (Warning, Notice, Parse error)
+- Covers: advanced, bypass, json, stacked, auth_bypass, filter_evasion
 
 ---
 
 ## 🛡️ Payload Tampering
 
-### When to Use Tampering
+### 22 Available Tamper Scripts
 
-Use tampering scripts when:
-- ✅ WAF is detected by the tool
-- ✅ Many requests are getting blocked (403/406 errors)
-- ✅ Scan shows 0 vulnerabilities but site looks vulnerable
-- ✅ Testing a hardened environment
-- ❌ Don't use for unprotected sites (unnecessary)
-
-### Tamper Script Selection Guide
-
-| Protection Level | Recommended Script | Effectiveness |
-|------------------|-------------------|---------------|
-| None | None | N/A |
-| Basic filtering | Space to Comment | High |
-| Cloudflare | Mixed Obfuscation | Medium-High |
-| ModSecurity | Inline Comments | Medium |
-| AWS WAF | Double URL Encode | Medium |
-| Akamai | Version Comment | Medium-High |
-| Generic WAF | Space to Comment | High |
-| Maximum Security | Mixed Obfuscation | Medium |
-
-### Combining Techniques
-
-For maximum evasion:
-1. Select "Mixed Obfuscation" tamper script
-2. Enable "Bypass" injection type
-3. Use "Full Scan" mode
-4. Increase request delay to 2-3 seconds
-
-### Custom Tampering
-
-**Create Your Own** (Advanced Users):
-1. Edit `tamper.py`
-2. Add new function following existing patterns
-3. Add to `get_tamper_scripts()` dictionary
-4. Restart tool to see new option
+| # | Script | Description |
+|---|--------|-------------|
+| 1 | Space to Comment | `SELECT FROM` → `SELECT/**/FROM` |
+| 2 | Random Case | `SELECT` → `SeLeCt` |
+| 3 | Random Whitespace | Space → tab/newline |
+| 4 | Inline Comments | `SELECT` → `/*1234*/SELECT/*5678*/` |
+| 5 | Double URL Encode | `'` → `%27` → `%2527` |
+| 6 | Hex Encode | `'admin'` → `0x61646d696e` |
+| 7 | Space to Plus | `SELECT FROM` → `SELECT+FROM` |
+| 8 | Version Comment | `SELECT` → `/*!50000SELECT*/` |
+| 9 | Unicode Escape | `SELECT` → `\u0053\u0045\u004c...` |
+| 10 | Hash Comment | `SELECT FROM` → `SELECT#\nFROM` |
+| 11 | Mixed Obfuscation | Combines multiple techniques |
+| 12 | Null Byte | Appends `%00` for string termination |
+| 13 | HPP | HTTP Parameter Pollution |
+| 14 | JSON Encode | JSON-wrapped payload |
+| 15 | Base64 Encode | Base64 encoded payload |
+| 16 | CHAR() Encode | `'A'` → `CHAR(65)` |
+| 17 | CONCAT Encode | `'admin'` → `CONCAT('ad','min')` |
+| 18 | BETWEEN Encode | `a=1` → `a BETWEEN 1 AND 1` |
+| 19 | LIKE Encode | `a='x'` → `a LIKE 'x'` |
+| 20 | Scientific Notation | `1` → `1e0` |
+| 21 | Chunked Transfer | Chunked encoding markers |
+| 22 | Encoding Chain | Chains multiple encoding stages |
 
 ---
 
 ## 📊 Reporting
 
 ### HTML Reports
-
-**Features:**
 - Professional CSS styling
-- Executive summary
-- Vulnerability breakdown
-- Risk classifications
-- Evidence screenshots (response excerpts)
+- Executive summary with risk breakdown
+- Vulnerability details with evidence
 - Remediation recommendations
 
-**Use Case**: Share with clients, management, or security team
-
 ### CSV Reports
-
-**Features:**
-- Spreadsheet-compatible format
+- Spreadsheet-ready format
 - All vulnerability fields
-- Easy filtering and sorting
-- Import into Excel/Google Sheets
-
-**Use Case**: Data analysis, tracking over time, bulk processing
+- Easy sorting and filtering
 
 ### JSON Reports
-
-**Features:**
 - Machine-readable format
-- Complete scan metadata
-- Nested vulnerability details
-- Version information
+- Full scan metadata
+- API integration ready
 
-**Use Case**: API integration, automation, custom processing
+---
 
-### Report Contents
+## 🏗️ Architecture
 
-Every report includes:
-- **Scan Metadata**: Date, time, scan mode, settings
-- **Target Information**: URLs tested, parameters
-- **Vulnerability Details**: Type, payload, confidence, evidence
-- **Risk Assessment**: High/Medium/Low classification
-- **Recommendations**: Specific remediation steps
+```
+sql-tester/
+├── main.py              # Launcher with dependency checks
+├── sqltool.py           # Main GUI application (1950+ lines)
+├── engine.py            # Detection engine (960+ lines)
+├── payload.py           # Payload manager (650+ lines)
+├── tamper.py            # 22 tamper scripts (295 lines)
+├── session.py           # Session & CSRF management (NEW)
+├── proxy.py             # Proxy routing & rotation (NEW)
+├── config.py            # YAML configuration loader (NEW)
+├── config.yaml          # Configuration file (NEW)
+├── user_agent.py        # User agent manager (360+ lines)
+├── report.py            # Report generator (285 lines)
+├── domain.py            # Domain validator (222 lines)
+├── requirements.txt     # Dependencies
+└── README.md            # This file
+```
 
 ---
 
@@ -766,54 +552,32 @@ Every report includes:
 - RAM: 2 GB
 - Disk: 100 MB
 
-### Architecture
+### Database Support
 
-```
-sql-tester/
-├── main.py              # Launcher with dependency checks
-├── sqltool.py           # Main GUI application (1800+ lines)
-├── engine.py            # Detection engine (680+ lines)
-├── payload.py           # Payload manager (420+ lines)
-├── tamper.py            # Tampering methods (162 lines)
-├── user_agent.py        # User agent manager (360+ lines)
-├── report.py            # Report generator (285 lines)
-├── domain.py            # Domain validator (222 lines)
-├── requirements.txt     # Dependencies
-├── README.md            # This file
-├── IMPROVEMENTS_2025.md # Improvement documentation
-└── CHANGELOG.md         # Version history
-```
+| Database | Version | Error | Union | Boolean | Time | NoSQL |
+|----------|---------|-------|-------|---------|------|-------|
+| MySQL | 5.0+ | ✅ | ✅ | ✅ | ✅ | — |
+| MariaDB | 10.0+ | ✅ | ✅ | ✅ | ✅ | — |
+| PostgreSQL | 9.0+ | ✅ | ✅ | ✅ | ✅ | — |
+| MSSQL | 2008+ | ✅ | ✅ | ✅ | ✅ | — |
+| Oracle | 10g+ | ✅ | ✅ | ✅ | ✅ | — |
+| SQLite | 3.0+ | ✅ | ✅ | ✅ | ✅ | — |
+| MongoDB | 3.0+ | — | — | ⚠️ | — | ✅ |
+| CouchDB | 2.0+ | — | — | — | — | ✅ |
+
+✅ Full support | ⚠️ Partial support | — Not applicable
 
 ### Performance Metrics
 
-**Scan Speed:**
-- Quick Scan (15 payloads): ~30 seconds per target
-- Full Scan (500+ payloads): ~10-15 minutes per target
-- Multi-target (Quick): ~1-2 minutes per target
-
-**Resource Usage:**
-- CPU: 5-15% (single thread)
-- Memory: 50-150 MB
-- Network: ~100 KB/s average
-
-**Accuracy Metrics:**
-- Overall Accuracy: 92%
-- False Positive Rate: <5%
-- False Negative Rate: <8%
-
-### Database Support
-
-| Database | Version | Detection | Union | Boolean | Time | Error |
-|----------|---------|-----------|-------|---------|------|-------|
-| MySQL | 5.0+ | ✅ | ✅ | ✅ | ✅ | ✅ |
-| MariaDB | 10.0+ | ✅ | ✅ | ✅ | ✅ | ✅ |
-| PostgreSQL | 9.0+ | ✅ | ✅ | ✅ | ✅ | ✅ |
-| MSSQL | 2008+ | ✅ | ✅ | ✅ | ✅ | ✅ |
-| Oracle | 10g+ | ✅ | ✅ | ✅ | ✅ | ✅ |
-| SQLite | 3.0+ | ✅ | ✅ | ✅ | ✅ | ✅ |
-| MongoDB | 3.0+ | ⚠️ | ❌ | ⚠️ | ❌ | ⚠️ |
-
-✅ Full support | ⚠️ Partial support | ❌ Not supported
+| Metric | Value |
+|--------|-------|
+| Overall accuracy | 92% |
+| False positive rate | <5% |
+| Time-based accuracy | 95% |
+| Boolean-based accuracy | 85% |
+| Quick Scan speed | ~30s per target |
+| Full Scan speed | ~10-15 min per target |
+| Memory usage | 50-150 MB |
 
 ---
 
@@ -855,17 +619,6 @@ Unauthorized use may result in:
 - Civil lawsuits for damages
 - Imprisonment and fines
 - Permanent criminal record
-- Loss of professional certifications
-
-### Responsible Disclosure
-
-If you find vulnerabilities:
-1. ✅ Report to system owner immediately
-2. ✅ Provide detailed vulnerability information
-3. ✅ Give reasonable time for remediation
-4. ✅ Follow coordinated disclosure timeline
-5. ❌ Do NOT publicly disclose before fix
-6. ❌ Do NOT exploit the vulnerability
 
 ### Developer Liability
 
@@ -874,12 +627,6 @@ If you find vulnerabilities:
 - Are NOT responsible for any damages caused
 - Do NOT condone unauthorized testing
 - Do NOT provide support for illegal activities
-
-**By using this tool, you agree to:**
-- Take full responsibility for your actions
-- Comply with all applicable laws
-- Use tool only for authorized purposes
-- Follow responsible disclosure practices
 
 ---
 
@@ -893,63 +640,42 @@ A: Yes, completely free for educational and authorized testing purposes.
 **Q: Can I use this for bug bounties?**
 A: Yes, if the target is in-scope for the bug bounty program.
 
-**Q: Will this tool get me in trouble?**
-A: Only if you use it illegally. Always get written permission first.
-
-**Q: Is it safe to use?**
-A: Yes, the tool only sends HTTP requests. It doesn't exploit vulnerabilities automatically.
+**Q: What changed in 2026.0?**
+A: Major upgrade — YAML config, structured logging, 900+ payloads (was 500+), 22 tamper scripts (was 11), second-order & NoSQL detection, session/proxy management, and critical bug fixes.
 
 ### Technical Questions
 
 **Q: Why does the scan take so long?**
-A: Full scans test 500+ payloads. Use Quick Scan for faster results (15 payloads per type).
-
-**Q: Why am I getting so many false positives?**
-A: Version 2025.2 has <5% false positive rate. If you see many, check if you're testing educational sites.
-
-**Q: What's the difference between Quick and Full scan?**
-A: Quick = 15 payloads/type (~2 min), Full = all 500+ payloads (~15 min).
+A: Full scans test 900+ payloads. Use Quick Scan for faster results (15 payloads per type).
 
 **Q: Can I add my own payloads?**
-A: Yes! Go to Payloads tab and use the editor to add custom payloads.
+A: Yes! Go to Payloads tab and use the editor, or add them directly in `payload.py`.
 
-**Q: Does this work with JavaScript-heavy sites?**
-A: Limited. This tool tests server-side SQLi. Client-side injection requires different tools.
+**Q: How do I scan through a proxy?**
+A: Check "Enable Proxy" in the GUI, enter a proxy URL (e.g., `socks5://127.0.0.1:9050`), or click "Load Proxy List" to load multiple proxies from a `.txt` file for rotation. Supports `ip:port`, `http://`, `socks5://`, and authenticated proxies.
 
-**Q: What if WAF is detected?**
-A: Use the Bypass injection type and select an appropriate tamper script.
+**Q: Does this support authenticated scanning?**
+A: Yes! Use `session.py` for cookie injection, login flows, and CSRF-protected forms.
 
 ### Troubleshooting
 
 **Q: Tool won't start / crashes on launch**
 A: Check Python version (need 3.7+) and install dependencies: `pip install -r requirements.txt`
 
-**Q: Getting "No module named 'requests'" error**
-A: Install dependencies: `pip install requests`
+**Q: Getting import errors**
+A: Run `pip install -r requirements.txt` to install all dependencies (requests, pyyaml, rich, tenacity, colorama).
 
 **Q: Tkinter not found error**
-A: Install tkinter:
 - Ubuntu/Debian: `sudo apt-get install python3-tk`
 - Mac: `brew install python-tk`
-- Windows: Usually included, reinstall Python if missing
+- Windows: Usually included; reinstall Python if missing
 
-**Q: All scans return "Not Vulnerable" but I know the site is vulnerable**
-A: Try:
-1. Select different injection types
-2. Use Full Scan instead of Quick
-3. Try different tamper scripts
-4. Check if WAF is blocking requests
-
-**Q: Scan stuck at "Establishing baseline..."**
-A: Check if target URL is accessible and responds to requests.
+**Q: All scans return "Not Vulnerable"**
+A: Try: (1) Select different injection types, (2) Use Full Scan, (3) Try tamper scripts, (4) Check if WAF is blocking.
 
 ---
 
 ## 💡 Support
-
-### Documentation
-
-- **README.md** - This file (complete usage guide)
 
 ### Community
 
@@ -966,22 +692,14 @@ When reporting bugs, include:
 4. Steps to reproduce
 5. Expected vs actual behavior
 
-### Feature Requests
-
-We welcome feature requests! Please include:
-1. Use case description
-2. Proposed implementation
-3. Why it would be useful
-4. Any related tools that have this feature
-
 ### Contributing
 
-Contributions are welcome! Please:
 1. Fork the repository
 2. Create a feature branch
 3. Make your changes
-4. Add tests if applicable
-5. Submit a pull request
+4. Submit a pull request
+
+> **Note:** I don't particularly care about the UI/GUI design — my priority is functionality. If you'd like to improve the GUI appearance, feel free to submit a pull request. Contributions to make the interface look better are always welcome!
 
 ---
 
@@ -989,54 +707,38 @@ Contributions are welcome! Please:
 
 **Educational Use Only License**
 
-This tool is provided for educational and authorized security testing purposes only. See LICENSE file for full terms.
+This tool is provided for educational and authorized security testing purposes only.
 
 ---
 
 ## 🙏 Acknowledgments
 
-### Special Thanks
-
-- **SQLMap Team** - Inspiration for detection techniques
-- **OWASP** - SQL injection research and documentation
-- **PortSwigger** - Web security education
-- **Security Community** - Payload contributions and feedback
+- **SQLMap Team** — Inspiration for detection techniques
+- **OWASP** — SQL injection research and documentation
+- **PortSwigger** — Web security education
+- **Security Community** — Payload contributions and feedback
 
 ### Built With
 
-- **Python 3.7+** - Core programming language
-- **Tkinter** - GUI framework
-- **Requests** - HTTP library
-- **Love & Coffee** ☕ - Developer fuel
+- **Python 3.7+** — Core programming language
+- **Tkinter** — GUI framework
+- **Requests** — HTTP library
+- **PyYAML** — Configuration management
+- **Rich** — Enhanced terminal output
 
 ---
 
 ## 📞 Contact
 
-- **Developer**: VanessaEvo
+- **Developer**: ShinX / VanessaEvo
 - **GitHub**: https://github.com/VanessaEvo
 - **Project**: https://github.com/VanessaEvo/sql-tester
 
 ---
 
-## 🎯 Final Notes
-
-### Remember:
-
-✅ **Always get written permission before testing**
-✅ **Use for education and authorized testing only**
-✅ **Report vulnerabilities responsibly**
-✅ **Respect terms of service**
-✅ **Follow responsible disclosure**
-
-❌ **Never test without authorization**
-❌ **Never use for malicious purposes**
-❌ **Never exploit vulnerabilities**
-❌ **Never cause damage**
-
 ### Happy (Ethical) Hacking! 🎓🔒
 
 ---
 
-*Last Updated: November 21, 2025*
-*Version: 2025.2 Enhanced Edition*
+*Last Updated: April 2026*
+*Version: 2026.0*
